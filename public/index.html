@@ -12,6 +12,10 @@
   input, button { padding: 12px; font-size: 16px; border-radius: 8px; border: 1px solid #2c4256; background: #14263a; color: inherit; }
   button { background: #2f7de1; border: 0; cursor: pointer; font-weight: 600; }
   button:hover { background: #4a93f5; }
+  #leave { background: #c0392b; }
+  #leave:hover { background: #e04b3a; }
+  #ask { display: none; position: fixed; inset: 0; background: #000a; align-items: center; justify-content: center; z-index: 9; }
+  #ask .box { background: #14263a; padding: 24px; border-radius: 12px; text-align: center; display: flex; flex-direction: column; gap: 14px; }
   #game { display: none; width: 100%; max-width: 1080px; padding: 8px; }
   canvas { width: 100%; height: auto; display: block; border-radius: 10px; cursor: none; touch-action: none; }
   #bar { display: flex; gap: 10px; align-items: center; justify-content: space-between; font-size: 14px; color: #9db4c8; padding: 8px 2px; flex-wrap: wrap; }
@@ -32,9 +36,12 @@
     <span id="info"></span>
     <span>Souris : bouger · <b>Z</b> / <b>E</b> : tourner · <b>T</b> : barre droite</span>
     <button id="copy">Copier le lien</button>
+    <button id="leave">Retour au lobby</button>
   </div>
   <canvas id="cv" width="1080" height="680"></canvas>
 </div>
+
+<div id="ask"><div class="box"><p id="askText"></p><div style="display:flex;gap:10px;justify-content:center"><button id="yes">Accepter</button><button id="no" style="background:#555">Refuser</button></div></div></div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
@@ -80,23 +87,43 @@ function updateMe(dt) {
   else if (now - (me.last || 0) > 600 && buf.length) { const l = buf[buf.length - 1].s.pl[side]; if (l) me.a += angDiff(me.a, l[2]) * 0.1; }
 }
 
+let joinInfo = null;
+const baseInfo = () => side < 0 ? 'Spectateur' : side === 0 ? 'Tu joues à gauche (bleu)' : 'Tu joues à droite (rouge)';
+function toMenu() {
+  joinInfo = null; side = -1; me = null; buf.length = 0;
+  $('ask').style.display = 'none';
+  $('game').style.display = 'none';
+  $('menu').style.display = 'flex';
+}
+
 $('go').onclick = () => {
   const name = $('name').value.trim() || 'Joueur';
   const room = $('room').value.trim() || 'salon';
   localStorage.setItem('pseudo', name);
+  joinInfo = { name, room };
+  if (sock) { sock.emit('join', joinInfo); return; }
   sock = io({ transports: ['websocket'] });
-  sock.on('connect', () => sock.emit('join', { name, room }));
+  sock.on('connect', () => { if (joinInfo) sock.emit('join', joinInfo); });
   sock.on('joined', d => {
     side = d.side; roomCode = d.room;
     me = side < 0 ? null : { x: side === 0 ? 150 : W - 150, y: H / 2, a: HALF, last: 0 };
     $('menu').style.display = 'none';
     $('game').style.display = 'block';
-    $('info').textContent = side < 0 ? 'Spectateur' : side === 0 ? 'Tu joues à gauche (bleu)' : 'Tu joues à droite (rouge)';
+    $('info').textContent = baseInfo();
   });
   sock.on('s', s => { buf.push({ t: performance.now(), s }); if (buf.length > 30) buf.shift(); });
+  sock.on('left', toMenu);
+  sock.on('ask', d => { $('askText').textContent = d.name + ' veut annuler le match.'; $('ask').style.display = 'flex'; });
+  sock.on('askend', () => { $('ask').style.display = 'none'; });
+  sock.on('wait', () => { $('info').textContent = 'Demande envoyée, en attente de ton adversaire…'; });
+  sock.on('refused', () => { $('info').textContent = 'Ton adversaire a refusé.'; setTimeout(() => { $('info').textContent = baseInfo(); }, 2500); });
   setInterval(() => sock.emit('in', { x: mouse.x, y: mouse.y, r: (keys.e ? 1 : 0) - (keys.z ? 1 : 0), t: keys.t }), 1000 / 60);
   requestAnimationFrame(draw);
 };
+
+$('leave').onclick = () => { if (sock) sock.emit('leave'); };
+$('yes').onclick = () => { sock.emit('answer', true); $('ask').style.display = 'none'; };
+$('no').onclick = () => { sock.emit('answer', false); $('ask').style.display = 'none'; };
 
 $('copy').onclick = () => {
   const url = location.origin + '/?room=' + roomCode;
@@ -123,6 +150,8 @@ function draw() {
   const now = performance.now(), dt = Math.min(0.05, (now - last) / 1000); last = now;
   updateMe(dt);
   const S = view();
+  const lbl = (side < 0 || !S || !S.pl[0] || !S.pl[1]) ? 'Retour au lobby' : "Demander l'annulation";
+  if ($('leave').textContent !== lbl) $('leave').textContent = lbl;
   c.clearRect(0, 0, cv.width, cv.height);
   c.fillStyle = '#0b141d'; c.fillRect(0, 0, cv.width, cv.height);
   c.save(); c.translate(M, M);
