@@ -21,7 +21,7 @@ const f = n => Math.round(n * 10) / 10;
 const reset = r => { r.puck = { x: W / 2, y: H / 2, vx: 0, vy: 0 }; };
 
 function newRoom() {
-  const r = { players: [null, null], spect: [], score: [0, 0], freeze: 0, winner: -1, msg: '' };
+  const r = { players: [null, null], spect: [], score: [0, 0], freeze: 0, winner: -1, msg: '', cancelFrom: -1 };
   reset(r);
   return r;
 }
@@ -107,23 +107,47 @@ setInterval(() => {
   }
 }, 1000 / 60);
 
-io.on('connection', sock => {
-  let code = null, me = null;
+function leaveRoom(sock) {
+  const { code, me } = sock.data;
+  sock.data = {};
+  const r = rooms.get(code);
+  if (!r) return;
+  sock.leave(code);
+  r.spect = r.spect.filter(x => x.id !== sock.id);
+  r.cancelFrom = -1;
+  io.to(code).emit('askend');
+  if (me) {
+    r.players[me.side] = null;
+    r.score = [0, 0]; r.winner = -1; r.freeze = 0; r.msg = '';
+    reset(r);
+    const next = r.spect.shift();
+    if (next) {
+      r.players[me.side] = newPlayer(next.id, next.name, me.side);
+      const ns = io.sockets.sockets.get(next.id);
+      if (ns) ns.data.me = r.players[me.side];
+      io.to(next.id).emit('joined', { side: me.side, room: code });
+    }
+  }
+  if (!r.players[0] && !r.players[1] && !r.spect.length) rooms.delete(code);
+}
 
+io.on('connection', sock => {
   sock.on('join', ({ name, room } = {}) => {
-    if (code) return;
+    if (sock.data.code) return;
     name = String(name || '').trim().slice(0, 16) || 'Joueur';
-    code = String(room || '').trim().toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 20) || 'salon';
+    const code = String(room || '').trim().toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 20) || 'salon';
     let r = rooms.get(code);
     if (!r) rooms.set(code, (r = newRoom()));
     sock.join(code);
+    sock.data = { code, me: null };
     const side = r.players.indexOf(null);
-    if (side >= 0) r.players[side] = me = newPlayer(sock.id, name, side);
+    if (side >= 0) r.players[side] = sock.data.me = newPlayer(sock.id, name, side);
     else r.spect.push({ id: sock.id, name });
     sock.emit('joined', { side, room: code });
   });
 
   sock.on('in', d => {
+    const me = sock.data.me;
     if (!me || !d) return;
     me.tx = +d.x || 0;
     me.ty = +d.y || 0;
@@ -131,22 +155,38 @@ io.on('connection', sock => {
     me.t = !!d.t;
   });
 
-  sock.on('disconnect', () => {
+  // Bouton "Retour au lobby" : seul -> on quitte ; avec un adversaire -> demande d'annulation
+  sock.on('leave', () => {
+    const { code, me } = sock.data;
     const r = rooms.get(code);
     if (!r) return;
-    r.spect = r.spect.filter(s => s.id !== sock.id);
-    if (me) {
-      r.players[me.side] = null;
-      r.score = [0, 0]; r.winner = -1; r.freeze = 0; r.msg = '';
-      reset(r);
-      const next = r.spect.shift();
-      if (next) {
-        r.players[me.side] = newPlayer(next.id, next.name, me.side);
-        io.to(next.id).emit('joined', { side: me.side, room: code });
-      }
+    const other = me ? r.players[1 - me.side] : null;
+    if (other) {
+      r.cancelFrom = me.side;
+      io.to(other.id).emit('ask', { name: me.name });
+      sock.emit('wait');
+    } else {
+      leaveRoom(sock);
+      sock.emit('left');
     }
-    if (!r.players[0] && !r.players[1] && !r.spect.length) rooms.delete(code);
   });
+
+  sock.on('answer', ok => {
+    const { code, me } = sock.data;
+    const r = rooms.get(code);
+    if (!r || !me || r.cancelFrom !== 1 - me.side) return;
+    const asker = r.players[1 - me.side];
+    r.cancelFrom = -1;
+    if (!asker) return;
+    if (ok) {
+      for (const id of [asker.id, sock.id]) {
+        const k = io.sockets.sockets.get(id);
+        if (k) { leaveRoom(k); k.emit('left'); }
+      }
+    } else io.to(asker.id).emit('refused');
+  });
+
+  sock.on('disconnect', () => leaveRoom(sock));
 });
 
 const PORT = process.env.PORT || 3000;
