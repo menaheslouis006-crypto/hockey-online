@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Air Hockey en ligne</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #0b141d; color: #e8f1f8; font-family: system-ui, sans-serif; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+  #menu { margin-top: 12vh; display: flex; flex-direction: column; gap: 12px; width: min(360px, 90vw); }
+  h1 { margin: 0 0 8px; text-align: center; }
+  input, button { padding: 12px; font-size: 16px; border-radius: 8px; border: 1px solid #2c4256; background: #14263a; color: inherit; }
+  button { background: #2f7de1; border: 0; cursor: pointer; font-weight: 600; }
+  button:hover { background: #4a93f5; }
+  #game { display: none; width: 100%; max-width: 1080px; padding: 8px; }
+  canvas { width: 100%; height: auto; display: block; border-radius: 10px; cursor: none; touch-action: none; }
+  #bar { display: flex; gap: 10px; align-items: center; justify-content: space-between; font-size: 14px; color: #9db4c8; padding: 8px 2px; flex-wrap: wrap; }
+  #bar button { padding: 6px 12px; font-size: 13px; }
+</style>
+</head>
+<body>
+<div id="menu">
+  <h1>🏒 Air Hockey</h1>
+  <input id="name" placeholder="Ton pseudo" maxlength="16">
+  <input id="room" placeholder="Code du salon (ex: les-potes)" maxlength="20">
+  <button id="go">Jouer</button>
+  <small style="color:#9db4c8;text-align:center">Envoie le même code (ou le lien) à ton pote pour jouer ensemble.</small>
+</div>
+
+<div id="game">
+  <div id="bar">
+    <span id="info"></span>
+    <span>Souris : bouger · <b>Z</b> / <b>E</b> : tourner la barre</span>
+    <button id="copy">Copier le lien</button>
+  </div>
+  <canvas id="cv" width="1080" height="680"></canvas>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const W = 1000, H = 600, M = 40, GOAL = 180, GT = (H - GOAL) / 2, PR = 14, HW = 65, HH = 8;
+const $ = id => document.getElementById(id);
+const cv = $('cv'), c = cv.getContext('2d');
+const params = new URLSearchParams(location.search);
+$('name').value = localStorage.getItem('pseudo') || '';
+$('room').value = params.get('room') || '';
+
+let sock, S = null, side = -1, roomCode = '';
+const mouse = { x: W / 2, y: H / 2 }, keys = { z: false, e: false };
+
+$('go').onclick = () => {
+  const name = $('name').value.trim() || 'Joueur';
+  const room = $('room').value.trim() || 'salon';
+  localStorage.setItem('pseudo', name);
+  sock = io();
+  sock.on('connect', () => sock.emit('join', { name, room }));
+  sock.on('joined', d => {
+    side = d.side; roomCode = d.room;
+    $('menu').style.display = 'none';
+    $('game').style.display = 'block';
+    $('info').textContent = side < 0 ? 'Spectateur' : side === 0 ? 'Tu joues à gauche (bleu)' : 'Tu joues à droite (rouge)';
+  });
+  sock.on('s', s => { S = s; });
+  setInterval(() => sock.emit('in', { x: mouse.x, y: mouse.y, r: (keys.e ? 1 : 0) - (keys.z ? 1 : 0) }), 1000 / 60);
+  requestAnimationFrame(draw);
+};
+
+$('copy').onclick = () => {
+  const url = location.origin + '/?room=' + roomCode;
+  navigator.clipboard.writeText(url).then(() => { $('copy').textContent = 'Copié !'; setTimeout(() => $('copy').textContent = 'Copier le lien', 1500); });
+};
+
+function setMouse(e) {
+  const r = cv.getBoundingClientRect(), k = cv.width / r.width;
+  mouse.x = (e.clientX - r.left) * k - M;
+  mouse.y = (e.clientY - r.top) * k - M;
+}
+cv.addEventListener('pointermove', setMouse);
+cv.addEventListener('pointerdown', setMouse);
+addEventListener('keydown', e => { const k = e.key.toLowerCase(); if (k in keys) keys[k] = true; });
+addEventListener('keyup', e => { const k = e.key.toLowerCase(); if (k in keys) keys[k] = false; });
+addEventListener('blur', () => { keys.z = keys.e = false; });
+
+function text(t, x, y, size, color, align = 'center') {
+  c.font = `bold ${size}px system-ui, sans-serif`; c.fillStyle = color; c.textAlign = align; c.fillText(t, x, y);
+}
+
+function draw() {
+  requestAnimationFrame(draw);
+  c.clearRect(0, 0, cv.width, cv.height);
+  c.fillStyle = '#0b141d'; c.fillRect(0, 0, cv.width, cv.height);
+  c.save(); c.translate(M, M);
+
+  // glace
+  c.fillStyle = '#12293d'; c.fillRect(0, 0, W, H);
+  c.strokeStyle = '#ffffff30'; c.lineWidth = 3;
+  c.beginPath(); c.moveTo(W / 2, 0); c.lineTo(W / 2, H); c.stroke();
+  c.beginPath(); c.arc(W / 2, H / 2, 70, 0, Math.PI * 2); c.stroke();
+  c.strokeStyle = '#ffffff70'; c.lineWidth = 6; c.strokeRect(0, 0, W, H);
+  // buts
+  c.fillStyle = '#2f7de1'; c.fillRect(-30, GT, 34, GOAL);
+  c.fillStyle = '#e0473f'; c.fillRect(W - 4, GT, 34, GOAL);
+
+  if (S) {
+    // joueurs
+    S.pl.forEach((p, i) => {
+      if (!p) return;
+      c.save(); c.translate(p[0], p[1]); c.rotate(p[2]);
+      c.fillStyle = i === 0 ? '#4aa3ff' : '#ff6a5f';
+      c.fillRect(-HW, -HH, HW * 2, HH * 2);
+      c.strokeStyle = '#fff'; c.lineWidth = 2; c.strokeRect(-HW, -HH, HW * 2, HH * 2);
+      c.restore();
+      text(p[3], p[0], p[1] - 80, 15, '#ffffffaa');
+    });
+    // balle
+    c.fillStyle = '#fff'; c.shadowColor = '#fff'; c.shadowBlur = 14;
+    c.beginPath(); c.arc(S.p[0], S.p[1], PR, 0, Math.PI * 2); c.fill();
+    c.shadowBlur = 0;
+    // score
+    const n0 = S.pl[0] ? S.pl[0][3] : '…', n1 = S.pl[1] ? S.pl[1][3] : '…';
+    text(`${n0}  ${S.sc[0]}  -  ${S.sc[1]}  ${n1}`, W / 2, -12, 24, '#e8f1f8');
+    // messages
+    if (S.m) text(S.m, W / 2, H / 2 - 100, 44, '#ffd84a');
+    else if (!S.pl[0] || !S.pl[1]) text('En attente d\'un pote… envoie-lui le lien !', W / 2, H / 2 - 100, 28, '#9db4c8');
+  }
+  c.restore();
+}
+</script>
+</body>
+</html>
