@@ -12,7 +12,7 @@ app.get('/health', (_, res) => res.send('ok'));
 const W = 1000, H = 600, GOAL = 180, GT = (H - GOAL) / 2, GB = GT + GOAL;
 const PR = 14;          // rayon de la balle
 const HW = 65, HH = 8;  // demi-longueur / demi-épaisseur de la barre
-const WIN = 7, SPIN = 9, MAXV = 1600, REST = 0.92;
+const WIN = 7, SPIN = 4.5, MAXV = 1600, REST = 0.92;
 const rooms = new Map();
 
 const rot = (x, y, a) => [x * Math.cos(a) - y * Math.sin(a), x * Math.sin(a) + y * Math.cos(a)];
@@ -27,7 +27,7 @@ function newRoom() {
 }
 function newPlayer(id, name, side) {
   const x = side === 0 ? 150 : W - 150;
-  return { id, name, side, x, y: H / 2, tx: x, ty: H / 2, a: 0, w: 0, vx: 0, vy: 0, r: 0 };
+  return { id, name, side, x, y: H / 2, tx: x, ty: H / 2, a: Math.PI / 2, w: 0, vx: 0, vy: 0, r: 0, t: false };
 }
 
 // Collision balle (cercle) <-> barre (rectangle tournant)
@@ -72,6 +72,7 @@ function step(r, dt) {
       if (d > m) { dx *= m / d; dy *= m / d; }
       pl.vx = dx / s; pl.vy = dy / s; pl.x += dx; pl.y += dy;
       pl.w = pl.r * SPIN; pl.a += pl.w * s;
+      if (pl.t) { pl.a = Math.PI / 2; pl.w = 0; }
     }
     if (!active) continue;
     const p = r.puck;
@@ -127,6 +128,7 @@ io.on('connection', sock => {
     me.tx = +d.x || 0;
     me.ty = +d.y || 0;
     me.r = clamp(+d.r || 0, -1, 1);
+    me.t = !!d.t;
   });
 
   sock.on('disconnect', () => {
