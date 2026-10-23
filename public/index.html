@@ -12,6 +12,8 @@
   input, select, button { padding: 12px; font-size: 16px; border-radius: 8px; border: 1px solid #2c4256; background: #14263a; color: inherit; }
   button { background: #2f7de1; border: 0; cursor: pointer; font-weight: 600; }
   button:hover { background: #4a93f5; }
+  #spdBox { display: none; gap: 10px; align-items: center; padding: 4px 2px 8px; font-size: 14px; color: #ffd84a; }
+  #spd { padding: 0; width: min(260px, 60vw); }
   #leave { background: #c0392b; }
   #tools { display: none; gap: 8px; flex-wrap: wrap; padding: 4px 2px 8px; align-items: center; }
   #tools button { padding: 6px 12px; font-size: 13px; }
@@ -32,6 +34,7 @@
   <input id="name" placeholder="Ton pseudo" maxlength="16">
   <input id="room" placeholder="Code du salon (ex: les-potes)" maxlength="20">
   <select id="mode"><option value="m">Match 1v1</option><option value="c">Mode créatif (map libre, jusqu'à 8 joueurs)</option></select>
+  <select id="variant"><option value="0">Basique (vitesse de balle normale)</option><option value="1">Fun (vitesse de la balle réglable)</option></select>
   <button id="go">Jouer</button>
   <small style="color:#9db4c8;text-align:center">Envoie le même code (ou le lien) à ton pote pour jouer ensemble.</small>
 </div>
@@ -43,6 +46,7 @@
     <button id="copy">Copier le lien</button>
     <button id="leave">Retour au lobby</button>
   </div>
+  <div id="spdBox"><span>⚡ Vitesse de la balle</span><input type="range" id="spd" min="0.5" max="3" step="0.1" value="1"><b id="spdVal">x1.0</b><small style="color:#9db4c8">(x1.0 = normale)</small></div>
   <div id="tools">
     <button id="editBtn">✏️ Éditer la map</button>
     <span id="toolBtns">
@@ -102,7 +106,7 @@ function updateMe(dt) {
   if (l && now - (mouse.t || 0) > 600) { me.x += (l[0] - me.x) * 0.1; me.y += (l[1] - me.y) * 0.1; }
 }
 
-let joinInfo = null, mode = 'm', myId = null, edit = false, tool = 'w', MAP = { o: [], b: [] };
+let joinInfo = null, fun = false, mode = 'm', myId = null, edit = false, tool = 'w', MAP = { o: [], b: [] };
 const size = { w: 140, m: 30, c: 35 }, RNG = { w: [40, 400, 10], m: [12, 90, 3], c: [12, 90, 3] };
 const COLORS = ['#4aa3ff', '#ff6a5f', '#6be37a', '#ffd84a', '#c08bff', '#ff9f43', '#2ee6d6', '#ff7eb6'];
 const rot2 = (x, y, a) => [x * Math.cos(a) - y * Math.sin(a), x * Math.sin(a) + y * Math.cos(a)];
@@ -180,10 +184,11 @@ cv.addEventListener('wheel', e => {
   const [lo, hi, st] = RNG[tool];
   size[tool] = Math.max(lo, Math.min(hi, size[tool] - Math.sign(e.deltaY) * st));
 }, { passive: false });
-const baseInfo = () => mode === 'c' ? 'Mode créatif : construis la map avec tes potes' : side < 0 ? 'Spectateur' : side === 0 ? 'Tu joues à gauche (bleu)' : 'Tu joues à droite (rouge)';
+const baseInfo = () => (fun ? '⚡ FUN · ' : '') + (mode === 'c' ? 'Mode créatif : construis la map avec tes potes' : side < 0 ? 'Spectateur' : side === 0 ? 'Tu joues à gauche (bleu)' : 'Tu joues à droite (rouge)');
+function setSpd(v) { $('spd').value = v; $('spdVal').textContent = 'x' + Number(v).toFixed(1); }
 function toMenu() {
-  joinInfo = null; side = -1; me = null; buf.length = 0; mode = 'm'; edit = false;
-  $('tools').style.display = 'none';
+  joinInfo = null; side = -1; me = null; buf.length = 0; mode = 'm'; edit = false; fun = false;
+  $('tools').style.display = 'none'; $('spdBox').style.display = 'none';
   $('ask').style.display = 'none';
   $('game').style.display = 'none';
   $('menu').style.display = 'flex';
@@ -193,12 +198,13 @@ $('go').onclick = () => {
   const name = $('name').value.trim() || 'Joueur';
   const room = $('room').value.trim() || 'salon';
   localStorage.setItem('pseudo', name);
-  joinInfo = { name, room, mode: $('mode').value };
+  joinInfo = { name, room, mode: $('mode').value, fun: $('variant').value === '1' };
   if (sock) { sock.emit('join', joinInfo); return; }
   sock = io({ transports: ['websocket'] });
   sock.on('connect', () => { if (joinInfo) sock.emit('join', joinInfo); });
   sock.on('joined', d => {
     side = d.side; roomCode = d.room; mode = d.mode || 'm'; myId = d.id; buf.length = 0; edit = false;
+    fun = !!d.fun; setSpd(d.spd || 1); $('spdBox').style.display = fun ? 'flex' : 'none';
     $('toolBtns').style.display = 'none'; $('editBtn').textContent = '✏️ Éditer la map';
     $('tools').style.display = mode === 'c' ? 'flex' : 'none';
     me = side < 0 ? null : { x: side === 0 ? 150 : W - 150, y: H / 2, a: HALF, last: 0 };
@@ -210,6 +216,7 @@ $('go').onclick = () => {
   sock.on('left', toMenu);
   sock.on('c', s => { buf.push({ t: performance.now(), s }); if (buf.length > 30) buf.shift(); });
   sock.on('map', m => { MAP = m; });
+  sock.on('spd', v => { if (document.activeElement !== $('spd')) setSpd(v); });
   sock.on('err', m => { alert(m); joinInfo = null; });
   sock.on('ask', d => { $('askText').textContent = d.name + ' veut annuler le match.'; $('ask').style.display = 'flex'; });
   sock.on('askend', () => { $('ask').style.display = 'none'; });
@@ -222,6 +229,8 @@ $('go').onclick = () => {
 $('leave').onclick = () => { if (sock) sock.emit('leave'); };
 $('yes').onclick = () => { sock.emit('answer', true); $('ask').style.display = 'none'; };
 $('no').onclick = () => { sock.emit('answer', false); $('ask').style.display = 'none'; };
+
+$('spd').oninput = () => { $('spdVal').textContent = 'x' + (+$('spd').value).toFixed(1); sock.emit('spd', +$('spd').value); };
 
 // ----- outils du mode créatif -----
 $('editBtn').onclick = () => { edit = !edit; $('toolBtns').style.display = edit ? 'flex' : 'none'; $('editBtn').textContent = edit ? '▶ Jouer' : '✏️ Éditer la map'; };

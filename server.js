@@ -22,8 +22,8 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const f = n => Math.round(n * 10) / 10;
 const reset = r => { r.puck = { x: W / 2, y: H / 2, vx: 0, vy: 0 }; };
 
-function newRoom() {
-  const r = { players: [null, null], spect: [], score: [0, 0], freeze: 0, winner: -1, msg: '', cancelFrom: -1 };
+function newRoom(fun) {
+  const r = { players: [null, null], spect: [], score: [0, 0], freeze: 0, winner: -1, msg: '', cancelFrom: -1, fun: !!fun, spd: 1 };
   reset(r);
   return r;
 }
@@ -64,14 +64,14 @@ function step(r, dt) {
     r.freeze -= dt;
     if (r.freeze <= 0) { if (r.winner >= 0) { r.score = [0, 0]; r.winner = -1; } r.msg = ''; }
   }
-  const n = 4, s = dt / n;
+  const n = Math.max(4, Math.ceil(4 * r.spd)), s = dt / n;
   const active = r.freeze <= 0 && (r.players[0] || r.players[1]);
   for (let i = 0; i < n; i++) {
     for (const pl of r.players) if (pl) HK.stepPaddle(pl, pl.tx, pl.ty, pl.r, pl.t, pl.side === 0 ? WL0 : WL1, s, SPIN);
     if (!active) continue;
     const p = r.puck;
-    p.x += p.vx * s; p.y += p.vy * s;
-    p.vx *= 1 - 0.35 * s; p.vy *= 1 - 0.35 * s;
+    p.x += p.vx * s * r.spd; p.y += p.vy * s * r.spd;
+    p.vx *= 1 - 0.35 * s * r.spd; p.vy *= 1 - 0.35 * s * r.spd;
     for (const pl of r.players) if (pl) hit(p, pl);
     // murs
     if (p.y < PR) { p.y = PR; p.vy = Math.abs(p.vy) * 0.95; }
@@ -97,8 +97,8 @@ function mkBall(r, x, y) {
   x = clamp(+x || W / 2, PR, W - PR); y = clamp(+y || H / 2, PR, H - PR);
   return { id: r.nid++, x, y, vx: 0, vy: 0, sx: x, sy: y };
 }
-function newCRoom() {
-  const r = { mode: 'c', pl: {}, objs: [], balls: [], score: 0, nid: 1, ci: 0 };
+function newCRoom(fun) {
+  const r = { mode: 'c', pl: {}, objs: [], balls: [], score: 0, nid: 1, ci: 0, fun: !!fun, spd: 1 };
   for (const d of [{ t: 'm', x: 500, y: 200, s: 30 }, { t: 'm', x: 500, y: 400, s: 30 }, { t: 'w', x: 760, y: 300, a: Math.PI / 2, s: 200 }, { t: 'c', x: 900, y: 300, s: 35 }]) r.objs.push(mkObj(r, d));
   r.balls.push(mkBall(r, 300, 300));
   return r;
@@ -117,13 +117,13 @@ function bump(b, o) {
   if (vn < 500) { b.vx += nx * (500 - vn); b.vy += ny * (500 - vn); }
 }
 function cstep(r, dt) {
-  const n = 4, s = dt / n, P = Object.values(r.pl), B = r.balls;
+  const n = Math.max(4, Math.ceil(4 * r.spd)), s = dt / n, P = Object.values(r.pl), B = r.balls;
   const wl = HK.BORDERS.concat(r.objs.filter(o => o.t === 'w').map(o => ({ x: o.x, y: o.y, a: o.a, hw: o.s / 2, hh: 8, f: true })));
   for (let i = 0; i < n; i++) {
     for (const pl of P) HK.stepPaddle(pl, pl.tx, pl.ty, pl.r, pl.t, wl, s, SPIN);
     for (const b of B) {
-      b.x += b.vx * s; b.y += b.vy * s;
-      b.vx *= 1 - 0.25 * s; b.vy *= 1 - 0.25 * s;
+      b.x += b.vx * s * r.spd; b.y += b.vy * s * r.spd;
+      b.vx *= 1 - 0.25 * s * r.spd; b.vy *= 1 - 0.25 * s * r.spd;
       for (const pl of P) hit(b, pl);
       for (const o of r.objs) {
         if (o.t === 'w') box(b, o.x, o.y, o.a, o.s / 2, 8, 0, 0, 0, 0.9);
@@ -190,19 +190,19 @@ function leaveRoom(sock) {
       r.players[me.side] = newPlayer(next.id, next.name, me.side);
       const ns = io.sockets.sockets.get(next.id);
       if (ns) ns.data.me = r.players[me.side];
-      io.to(next.id).emit('joined', { side: me.side, room: code });
+      io.to(next.id).emit('joined', { side: me.side, room: code, mode: 'm', id: next.id, fun: r.fun, spd: r.spd });
     }
   }
   if (!r.players[0] && !r.players[1] && !r.spect.length) rooms.delete(code);
 }
 
 io.on('connection', sock => {
-  sock.on('join', ({ name, room, mode } = {}) => {
+  sock.on('join', ({ name, room, mode, fun } = {}) => {
     if (sock.data.code) return;
     name = String(name || '').trim().slice(0, 16) || 'Joueur';
     const code = String(room || '').trim().toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 20) || 'salon';
     let r = rooms.get(code);
-    if (!r) rooms.set(code, (r = mode === 'c' ? newCRoom() : newRoom()));
+    if (!r) rooms.set(code, (r = mode === 'c' ? newCRoom(fun) : newRoom(fun)));
     if (r.mode === 'c' && Object.keys(r.pl).length >= 8) return sock.emit('err', 'Salon plein (8 joueurs max)');
     sock.join(code);
     sock.data = { code, me: null };
@@ -210,14 +210,14 @@ io.on('connection', sock => {
       const pl = newPlayer(sock.id, name, 0);
       pl.ci = r.ci++ % 8;
       r.pl[sock.id] = sock.data.me = pl;
-      sock.emit('joined', { side: 0, room: code, mode: 'c', id: sock.id });
+      sock.emit('joined', { side: 0, room: code, mode: 'c', id: sock.id, fun: r.fun, spd: r.spd });
       sock.emit('map', mapOf(r));
       return;
     }
     const side = r.players.indexOf(null);
     if (side >= 0) r.players[side] = sock.data.me = newPlayer(sock.id, name, side);
     else r.spect.push({ id: sock.id, name });
-    sock.emit('joined', { side, room: code, mode: 'm', id: sock.id });
+    sock.emit('joined', { side, room: code, mode: 'm', id: sock.id, fun: r.fun, spd: r.spd });
   });
 
   sock.on('in', d => {
@@ -259,6 +259,14 @@ io.on('connection', sock => {
         if (k) { leaveRoom(k); k.emit('left'); }
       }
     } else io.to(asker.id).emit('refused');
+  });
+
+  // Vitesse de la balle : seulement dans les salons "fun", réglable par tous les joueurs du salon
+  sock.on('spd', v => {
+    const code = sock.data.code, r = rooms.get(code);
+    if (!r || !r.fun) return;
+    r.spd = clamp(Math.round((+v || 1) * 10) / 10, 0.5, 3);
+    io.to(code).emit('spd', r.spd);
   });
 
   // ----- édition de la map (mode créatif) -----
