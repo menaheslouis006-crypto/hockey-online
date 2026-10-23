@@ -9,10 +9,14 @@
   body { margin: 0; background: #0b141d; color: #e8f1f8; font-family: system-ui, sans-serif; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
   #menu { margin-top: 12vh; display: flex; flex-direction: column; gap: 12px; width: min(360px, 90vw); }
   h1 { margin: 0 0 8px; text-align: center; }
-  input, button { padding: 12px; font-size: 16px; border-radius: 8px; border: 1px solid #2c4256; background: #14263a; color: inherit; }
+  input, select, button { padding: 12px; font-size: 16px; border-radius: 8px; border: 1px solid #2c4256; background: #14263a; color: inherit; }
   button { background: #2f7de1; border: 0; cursor: pointer; font-weight: 600; }
   button:hover { background: #4a93f5; }
   #leave { background: #c0392b; }
+  #tools { display: none; gap: 8px; flex-wrap: wrap; padding: 4px 2px 8px; align-items: center; }
+  #tools button { padding: 6px 12px; font-size: 13px; }
+  #tools button.on { outline: 2px solid #ffd84a; }
+  #toolBtns { display: none; gap: 8px; flex-wrap: wrap; }
   #leave:hover { background: #e04b3a; }
   #ask { display: none; position: fixed; inset: 0; background: #000a; align-items: center; justify-content: center; z-index: 9; }
   #ask .box { background: #14263a; padding: 24px; border-radius: 12px; text-align: center; display: flex; flex-direction: column; gap: 14px; }
@@ -27,6 +31,7 @@
   <h1>🏒 Air Hockey</h1>
   <input id="name" placeholder="Ton pseudo" maxlength="16">
   <input id="room" placeholder="Code du salon (ex: les-potes)" maxlength="20">
+  <select id="mode"><option value="m">Match 1v1</option><option value="c">Mode créatif (map libre, jusqu'à 8 joueurs)</option></select>
   <button id="go">Jouer</button>
   <small style="color:#9db4c8;text-align:center">Envoie le même code (ou le lien) à ton pote pour jouer ensemble.</small>
 </div>
@@ -37,6 +42,13 @@
     <span>Souris : bouger · <b>Z</b> / <b>E</b> : tourner · <b>T</b> : barre droite</span>
     <button id="copy">Copier le lien</button>
     <button id="leave">Retour au lobby</button>
+  </div>
+  <div id="tools">
+    <button id="editBtn">✏️ Éditer la map</button>
+    <span id="toolBtns">
+      <button data-tool="w" class="on">Mur</button><button data-tool="m">Bumper</button><button data-tool="c">Cible</button><button data-tool="b">Balle</button><button data-tool="x">Gomme</button>
+      <button id="resetBtn">Remettre les balles</button><button id="clearBtn">Tout vider</button><button id="expBtn">Exporter</button><button id="impBtn">Importer</button>
+    </span>
   </div>
   <canvas id="cv" width="1080" height="680"></canvas>
 </div>
@@ -76,7 +88,7 @@ function view() {
 // Ta propre barre est calculée en local : zéro délai pour toi
 function updateMe(dt) {
   if (!me) return;
-  const lo = side === 0 ? 20 : W / 2 + 10, hi = side === 0 ? W / 2 - 10 : W - 20;
+  const lo = mode === 'c' || side === 0 ? 20 : W / 2 + 10, hi = mode === 'c' ? W - 20 : side === 0 ? W / 2 - 10 : W - 20;
   const tx = Math.min(hi, Math.max(lo, mouse.x)), ty = Math.min(H - 20, Math.max(20, mouse.y));
   let dx = tx - me.x, dy = ty - me.y; const d = Math.hypot(dx, dy), m = 3000 * dt;
   if (d > m) { dx *= m / d; dy *= m / d; }
@@ -84,13 +96,91 @@ function updateMe(dt) {
   const r = (keys.e ? 1 : 0) - (keys.z ? 1 : 0), now = performance.now();
   if (keys.t) { me.a = HALF; me.last = now; }
   else if (r) { me.a += r * SPIN * dt; me.last = now; }
-  else if (now - (me.last || 0) > 600 && buf.length) { const l = buf[buf.length - 1].s.pl[side]; if (l) me.a += angDiff(me.a, l[2]) * 0.1; }
+  else if (now - (me.last || 0) > 600 && buf.length) { const L = buf[buf.length - 1].s.pl, l = mode === 'c' ? L.find(q => q[4] === myId) : L[side]; if (l) me.a += angDiff(me.a, l[2]) * 0.1; }
 }
 
-let joinInfo = null;
-const baseInfo = () => side < 0 ? 'Spectateur' : side === 0 ? 'Tu joues à gauche (bleu)' : 'Tu joues à droite (rouge)';
+let joinInfo = null, mode = 'm', myId = null, edit = false, tool = 'w', MAP = { o: [], b: [] };
+const size = { w: 140, m: 30, c: 35 }, RNG = { w: [40, 400, 10], m: [12, 90, 3], c: [12, 90, 3] };
+const COLORS = ['#4aa3ff', '#ff6a5f', '#6be37a', '#ffd84a', '#c08bff', '#ff9f43', '#2ee6d6', '#ff7eb6'];
+const rot2 = (x, y, a) => [x * Math.cos(a) - y * Math.sin(a), x * Math.sin(a) + y * Math.cos(a)];
+
+function viewC() {
+  const rt = performance.now() - DELAY;
+  while (buf.length > 2 && buf[1].t <= rt) buf.shift();
+  if (!buf.length) return null;
+  if (buf.length < 2) return buf[0].s;
+  const A = buf[0], B = buf[1], k = Math.max(0, Math.min(1, (rt - A.t) / (B.t - A.t)));
+  return { ...B.s,
+    pl: B.s.pl.map(q => { const a = A.s.pl.find(z => z[4] === q[4]); return a ? [lerp(a[0], q[0], k), lerp(a[1], q[1], k), a[2] + angDiff(a[2], q[2]) * k, q[3], q[4], q[5]] : q; }),
+    b: B.s.b.map(q => { const a = A.s.b.find(z => z[0] === q[0]); return a ? [q[0], lerp(a[1], q[1], k), lerp(a[2], q[2], k)] : q; }) };
+}
+
+function drawObj(o, alpha) {
+  c.save(); c.globalAlpha = alpha; c.translate(o.x, o.y);
+  if (o.t === 'w') { c.rotate(o.a); c.fillStyle = '#8fa6ba'; c.fillRect(-o.s / 2, -8, o.s, 16); }
+  else if (o.t === 'm') { c.fillStyle = '#ff9f43'; c.beginPath(); c.arc(0, 0, o.s, 0, Math.PI * 2); c.fill(); c.strokeStyle = '#fff'; c.lineWidth = 3; c.stroke(); }
+  else { c.fillStyle = '#6be37a44'; c.strokeStyle = '#6be37a'; c.lineWidth = 5; c.beginPath(); c.arc(0, 0, o.s, 0, Math.PI * 2); c.fill(); c.stroke(); }
+  c.restore();
+}
+
+function drawC(S) {
+  c.clearRect(0, 0, cv.width, cv.height);
+  c.fillStyle = '#0b141d'; c.fillRect(0, 0, cv.width, cv.height);
+  c.save(); c.translate(M, M);
+  c.fillStyle = '#12293d'; c.fillRect(0, 0, W, H);
+  c.strokeStyle = '#ffffff70'; c.lineWidth = 6; c.strokeRect(0, 0, W, H);
+  for (const o of MAP.o) drawObj(o, 1);
+  if (edit) for (const b of MAP.b) { c.strokeStyle = '#ffffff55'; c.lineWidth = 2; c.setLineDash([4, 4]); c.beginPath(); c.arc(b[1], b[2], PR + 4, 0, Math.PI * 2); c.stroke(); c.setLineDash([]); }
+  if (S) {
+    S.pl.forEach(q => {
+      const mine = q[4] === myId && me;
+      const x = mine ? me.x : q[0], y = mine ? me.y : q[1], a = mine ? me.a : q[2];
+      c.save(); c.translate(x, y); c.rotate(a);
+      c.fillStyle = COLORS[q[5] % 8]; c.fillRect(-HW, -HH, HW * 2, HH * 2);
+      c.strokeStyle = '#fff'; c.lineWidth = 2; c.strokeRect(-HW, -HH, HW * 2, HH * 2);
+      c.restore();
+      text(q[3], x, y - 80, 15, '#ffffffaa');
+    });
+    c.fillStyle = '#fff'; c.shadowColor = '#fff'; c.shadowBlur = 14;
+    for (const b of S.b) { c.beginPath(); c.arc(b[1], b[2], PR, 0, Math.PI * 2); c.fill(); }
+    c.shadowBlur = 0;
+    text('Cibles touchées : ' + S.sc, W / 2, -12, 22, '#e8f1f8');
+  }
+  if (edit) {
+    if (tool === 'b') { c.fillStyle = '#ffffff88'; c.beginPath(); c.arc(mouse.x, mouse.y, PR, 0, Math.PI * 2); c.fill(); }
+    else if (tool === 'x') { c.strokeStyle = '#ff4d4d'; c.lineWidth = 3; c.beginPath(); c.arc(mouse.x, mouse.y, 18, 0, Math.PI * 2); c.stroke(); }
+    else drawObj({ t: tool, x: mouse.x, y: mouse.y, a: me ? me.a : 0, s: size[tool] }, 0.5);
+    text('ÉDITION : clic = poser · molette = taille · Z/E = tourner le mur', W / 2, H + 30, 16, '#ffd84a');
+  }
+  c.restore();
+}
+
+function place() {
+  if (!sock) return;
+  if (tool === 'x') return erase();
+  if (tool === 'b') return sock.emit('add', { t: 'b', x: mouse.x, y: mouse.y });
+  sock.emit('add', { t: tool, x: mouse.x, y: mouse.y, a: tool === 'w' && me ? me.a : 0, s: size[tool] });
+}
+function erase() {
+  const L = buf.length ? buf[buf.length - 1].s : null;
+  if (L) for (const b of L.b) if (Math.hypot(b[1] - mouse.x, b[2] - mouse.y) < 24) return sock.emit('del', { id: b[0] });
+  for (const o of MAP.o) {
+    let ok;
+    if (o.t === 'w') { const [lx, ly] = rot2(mouse.x - o.x, mouse.y - o.y, -o.a); ok = Math.abs(lx) <= o.s / 2 + 4 && Math.abs(ly) <= 12; }
+    else ok = Math.hypot(mouse.x - o.x, mouse.y - o.y) <= o.s + 4;
+    if (ok) return sock.emit('del', { id: o.id });
+  }
+}
+cv.addEventListener('wheel', e => {
+  if (mode !== 'c' || !edit || !size[tool]) return;
+  e.preventDefault();
+  const [lo, hi, st] = RNG[tool];
+  size[tool] = Math.max(lo, Math.min(hi, size[tool] - Math.sign(e.deltaY) * st));
+}, { passive: false });
+const baseInfo = () => mode === 'c' ? 'Mode créatif : construis la map avec tes potes' : side < 0 ? 'Spectateur' : side === 0 ? 'Tu joues à gauche (bleu)' : 'Tu joues à droite (rouge)';
 function toMenu() {
-  joinInfo = null; side = -1; me = null; buf.length = 0;
+  joinInfo = null; side = -1; me = null; buf.length = 0; mode = 'm'; edit = false;
+  $('tools').style.display = 'none';
   $('ask').style.display = 'none';
   $('game').style.display = 'none';
   $('menu').style.display = 'flex';
@@ -100,12 +190,14 @@ $('go').onclick = () => {
   const name = $('name').value.trim() || 'Joueur';
   const room = $('room').value.trim() || 'salon';
   localStorage.setItem('pseudo', name);
-  joinInfo = { name, room };
+  joinInfo = { name, room, mode: $('mode').value };
   if (sock) { sock.emit('join', joinInfo); return; }
   sock = io({ transports: ['websocket'] });
   sock.on('connect', () => { if (joinInfo) sock.emit('join', joinInfo); });
   sock.on('joined', d => {
-    side = d.side; roomCode = d.room;
+    side = d.side; roomCode = d.room; mode = d.mode || 'm'; myId = d.id; buf.length = 0; edit = false;
+    $('toolBtns').style.display = 'none'; $('editBtn').textContent = '✏️ Éditer la map';
+    $('tools').style.display = mode === 'c' ? 'flex' : 'none';
     me = side < 0 ? null : { x: side === 0 ? 150 : W - 150, y: H / 2, a: HALF, last: 0 };
     $('menu').style.display = 'none';
     $('game').style.display = 'block';
@@ -113,6 +205,9 @@ $('go').onclick = () => {
   });
   sock.on('s', s => { buf.push({ t: performance.now(), s }); if (buf.length > 30) buf.shift(); });
   sock.on('left', toMenu);
+  sock.on('c', s => { buf.push({ t: performance.now(), s }); if (buf.length > 30) buf.shift(); });
+  sock.on('map', m => { MAP = m; });
+  sock.on('err', m => { alert(m); joinInfo = null; });
   sock.on('ask', d => { $('askText').textContent = d.name + ' veut annuler le match.'; $('ask').style.display = 'flex'; });
   sock.on('askend', () => { $('ask').style.display = 'none'; });
   sock.on('wait', () => { $('info').textContent = 'Demande envoyée, en attente de ton adversaire…'; });
@@ -125,6 +220,21 @@ $('leave').onclick = () => { if (sock) sock.emit('leave'); };
 $('yes').onclick = () => { sock.emit('answer', true); $('ask').style.display = 'none'; };
 $('no').onclick = () => { sock.emit('answer', false); $('ask').style.display = 'none'; };
 
+// ----- outils du mode créatif -----
+$('editBtn').onclick = () => { edit = !edit; $('toolBtns').style.display = edit ? 'flex' : 'none'; $('editBtn').textContent = edit ? '▶ Jouer' : '✏️ Éditer la map'; };
+document.querySelectorAll('[data-tool]').forEach(b => b.onclick = () => { tool = b.dataset.tool; document.querySelectorAll('[data-tool]').forEach(x => x.classList.toggle('on', x === b)); });
+$('resetBtn').onclick = () => sock.emit('reset');
+$('clearBtn').onclick = () => { if (confirm('Tout vider (murs, bumpers, cibles, balles) ?')) sock.emit('clear'); };
+$('expBtn').onclick = () => {
+  const j = JSON.stringify({ o: MAP.o.map(({ t, x, y, a, s }) => ({ t, x, y, a, s })), b: MAP.b.map(b => [b[1], b[2]]) });
+  navigator.clipboard.writeText(j).then(() => alert('Code de la map copié ! Garde-le ou envoie-le à tes potes (bouton Importer).'));
+};
+$('impBtn').onclick = () => {
+  const t = prompt('Colle le code de la map :');
+  if (!t) return;
+  try { sock.emit('load', JSON.parse(t)); } catch (e) { alert('Code invalide'); }
+};
+
 $('copy').onclick = () => {
   const url = location.origin + '/?room=' + roomCode;
   navigator.clipboard.writeText(url).then(() => { $('copy').textContent = 'Copié !'; setTimeout(() => $('copy').textContent = 'Copier le lien', 1500); });
@@ -136,7 +246,7 @@ function setMouse(e) {
   mouse.y = (e.clientY - r.top) * k - M;
 }
 cv.addEventListener('pointermove', setMouse);
-cv.addEventListener('pointerdown', setMouse);
+cv.addEventListener('pointerdown', e => { setMouse(e); if (mode === 'c' && edit) place(); });
 addEventListener('keydown', e => { const k = e.key.toLowerCase(); if (k in keys) keys[k] = true; });
 addEventListener('keyup', e => { const k = e.key.toLowerCase(); if (k in keys) keys[k] = false; });
 addEventListener('blur', () => { keys.z = keys.e = keys.t = false; });
@@ -149,9 +259,10 @@ function draw() {
   requestAnimationFrame(draw);
   const now = performance.now(), dt = Math.min(0.05, (now - last) / 1000); last = now;
   updateMe(dt);
-  const S = view();
-  const lbl = (side < 0 || !S || !S.pl[0] || !S.pl[1]) ? 'Retour au lobby' : "Demander l'annulation";
+  const S = mode === 'c' ? viewC() : view();
+  const lbl = (mode === 'c' || side < 0 || !S || !S.pl[0] || !S.pl[1]) ? 'Retour au lobby' : "Demander l'annulation";
   if ($('leave').textContent !== lbl) $('leave').textContent = lbl;
+  if (mode === 'c') { drawC(S); return; }
   c.clearRect(0, 0, cv.width, cv.height);
   c.fillStyle = '#0b141d'; c.fillRect(0, 0, cv.width, cv.height);
   c.save(); c.translate(M, M);

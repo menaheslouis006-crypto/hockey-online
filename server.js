@@ -30,23 +30,24 @@ function newPlayer(id, name, side) {
   return { id, name, side, x, y: H / 2, tx: x, ty: H / 2, a: Math.PI / 2, w: 0, vx: 0, vy: 0, r: 0, t: false };
 }
 
-// Collision balle (cercle) <-> barre (rectangle tournant)
-function hit(p, pl) {
-  const [lx, ly] = rot(p.x - pl.x, p.y - pl.y, -pl.a);
-  const cx = clamp(lx, -HW, HW), cy = clamp(ly, -HH, HH);
+// Collision balle (cercle) <-> boîte tournante (barre de joueur ou mur de la map)
+function box(p, x, y, a, hw, hh, bvx, bvy, w, e) {
+  const [lx, ly] = rot(p.x - x, p.y - y, -a);
+  const cx = clamp(lx, -hw, hw), cy = clamp(ly, -hh, hh);
   let dx = lx - cx, dy = ly - cy, d = Math.hypot(dx, dy);
   if (d >= PR) return;
   if (d < 1e-6) { dx = lx; dy = ly; d = Math.hypot(dx, dy) || 1; }
-  const [nx, ny] = rot(dx / d, dy / d, pl.a);          // normale monde
-  const [rx, ry] = rot(cx, cy, pl.a);                  // point de contact relatif
-  const vx = pl.vx - pl.w * ry, vy = pl.vy + pl.w * rx; // vitesse de la barre au contact (translation + rotation)
+  const [nx, ny] = rot(dx / d, dy / d, a);
+  const [rx, ry] = rot(cx, cy, a);
+  const vx = bvx - w * ry, vy = bvy + w * rx;
   p.x += nx * (PR - d);
   p.y += ny * (PR - d);
   const vn = (p.vx - vx) * nx + (p.vy - vy) * ny;
-  if (vn < 0) { p.vx -= (1 + REST) * vn * nx; p.vy -= (1 + REST) * vn * ny; }
-  const s = Math.hypot(p.vx, p.vy);
-  if (s > MAXV) { p.vx *= MAXV / s; p.vy *= MAXV / s; }
+  if (vn < 0) { p.vx -= (1 + e) * vn * nx; p.vy -= (1 + e) * vn * ny; }
+  const sp = Math.hypot(p.vx, p.vy);
+  if (sp > MAXV) { p.vx *= MAXV / sp; p.vy *= MAXV / sp; }
 }
+const hit = (p, pl) => box(p, pl.x, pl.y, pl.a, HW, HH, pl.vx, pl.vy, pl.w, REST);
 
 function goal(r, side) {
   r.score[side]++;
@@ -92,6 +93,83 @@ function step(r, dt) {
   }
 }
 
+// ================= MODE CRÉATIF =================
+const KIND = { w: [40, 400], m: [12, 90], c: [12, 90] }; // w = mur (longueur), m = bumper, c = cible (rayon)
+function mkObj(r, d) {
+  if (!d || !KIND[d.t]) return null;
+  const [lo, hi] = KIND[d.t];
+  return { id: r.nid++, t: d.t, x: clamp(+d.x || 0, 0, W), y: clamp(+d.y || 0, 0, H), a: clamp(+d.a || 0, -1000, 1000), s: clamp(+d.s || lo, lo, hi) };
+}
+function mkBall(r, x, y) {
+  x = clamp(+x || W / 2, PR, W - PR); y = clamp(+y || H / 2, PR, H - PR);
+  return { id: r.nid++, x, y, vx: 0, vy: 0, sx: x, sy: y };
+}
+function newCRoom() {
+  const r = { mode: 'c', pl: {}, objs: [], balls: [], score: 0, nid: 1, ci: 0 };
+  for (const d of [{ t: 'm', x: 500, y: 200, s: 30 }, { t: 'm', x: 500, y: 400, s: 30 }, { t: 'w', x: 760, y: 300, a: Math.PI / 2, s: 200 }, { t: 'c', x: 900, y: 300, s: 35 }]) r.objs.push(mkObj(r, d));
+  r.balls.push(mkBall(r, 300, 300));
+  return r;
+}
+const mapOf = r => ({ o: r.objs, b: r.balls.map(b => [b.id, b.sx, b.sy]) });
+const sendMap = (r, code) => io.to(code).emit('map', mapOf(r));
+const croom = sock => { const r = rooms.get(sock.data.code); return r && r.mode === 'c' ? r : null; };
+
+function mvp(pl, s) {
+  const tx = clamp(pl.tx, 20, W - 20), ty = clamp(pl.ty, 20, H - 20);
+  let dx = tx - pl.x, dy = ty - pl.y;
+  const d = Math.hypot(dx, dy), m = 3000 * s;
+  if (d > m) { dx *= m / d; dy *= m / d; }
+  pl.vx = dx / s; pl.vy = dy / s; pl.x += dx; pl.y += dy;
+  pl.w = pl.r * SPIN; pl.a += pl.w * s;
+  if (pl.t) { pl.a = Math.PI / 2; pl.w = 0; }
+}
+function bump(b, o) {
+  const dx = b.x - o.x, dy = b.y - o.y, d = Math.hypot(dx, dy), m = PR + o.s;
+  if (d >= m || d < 1e-6) return;
+  const nx = dx / d, ny = dy / d;
+  b.x = o.x + nx * m; b.y = o.y + ny * m;
+  let vn = b.vx * nx + b.vy * ny;
+  if (vn < 0) { b.vx -= 2 * vn * nx; b.vy -= 2 * vn * ny; vn = -vn; }
+  if (vn < 500) { b.vx += nx * (500 - vn); b.vy += ny * (500 - vn); }
+}
+function cstep(r, dt) {
+  const n = 4, s = dt / n, P = Object.values(r.pl), B = r.balls;
+  for (let i = 0; i < n; i++) {
+    for (const pl of P) mvp(pl, s);
+    for (const b of B) {
+      b.x += b.vx * s; b.y += b.vy * s;
+      b.vx *= 1 - 0.25 * s; b.vy *= 1 - 0.25 * s;
+      for (const pl of P) hit(b, pl);
+      for (const o of r.objs) {
+        if (o.t === 'w') box(b, o.x, o.y, o.a, o.s / 2, 8, 0, 0, 0, 0.9);
+        else if (o.t === 'm') bump(b, o);
+        else if (Math.hypot(b.x - o.x, b.y - o.y) < o.s) { r.score++; b.x = b.sx; b.y = b.sy; b.vx = b.vy = 0; }
+      }
+      if (b.x < PR) { b.x = PR; b.vx = Math.abs(b.vx) * 0.95; }
+      if (b.x > W - PR) { b.x = W - PR; b.vx = -Math.abs(b.vx) * 0.95; }
+      if (b.y < PR) { b.y = PR; b.vy = Math.abs(b.vy) * 0.95; }
+      if (b.y > H - PR) { b.y = H - PR; b.vy = -Math.abs(b.vy) * 0.95; }
+      const sp = Math.hypot(b.vx, b.vy);
+      if (sp > MAXV) { b.vx *= MAXV / sp; b.vy *= MAXV / sp; }
+    }
+    for (let j = 0; j < B.length; j++) for (let k = j + 1; k < B.length; k++) {
+      const p = B[j], q = B[k];
+      const dx = q.x - p.x, dy = q.y - p.y, d = Math.hypot(dx, dy);
+      if (d < 2 * PR && d > 0) {
+        const nx = dx / d, ny = dy / d, ov = (2 * PR - d) / 2;
+        p.x -= nx * ov; p.y -= ny * ov; q.x += nx * ov; q.y += ny * ov;
+        const vn = (q.vx - p.vx) * nx + (q.vy - p.vy) * ny;
+        if (vn < 0) { p.vx += vn * nx; p.vy += vn * ny; q.vx -= vn * nx; q.vy -= vn * ny; }
+      }
+    }
+  }
+}
+const csnap = r => ({
+  pl: Object.values(r.pl).map(q => [f(q.x), f(q.y), Math.round(q.a * 100) / 100, q.name, q.id, q.ci]),
+  b: r.balls.map(b => [b.id, f(b.x), f(b.y)]),
+  sc: r.score,
+});
+
 function snap(r) {
   return {
     p: [f(r.puck.x), f(r.puck.y)],
@@ -102,6 +180,7 @@ function snap(r) {
 
 setInterval(() => {
   for (const [code, r] of rooms) {
+    if (r.mode === 'c') { cstep(r, 1 / 60); io.to(code).emit('c', csnap(r)); continue; }
     step(r, 1 / 60);
     io.to(code).emit('s', snap(r));
   }
@@ -113,6 +192,7 @@ function leaveRoom(sock) {
   const r = rooms.get(code);
   if (!r) return;
   sock.leave(code);
+  if (r.mode === 'c') { delete r.pl[sock.id]; if (!Object.keys(r.pl).length) rooms.delete(code); return; }
   r.spect = r.spect.filter(x => x.id !== sock.id);
   r.cancelFrom = -1;
   io.to(code).emit('askend');
@@ -132,18 +212,27 @@ function leaveRoom(sock) {
 }
 
 io.on('connection', sock => {
-  sock.on('join', ({ name, room } = {}) => {
+  sock.on('join', ({ name, room, mode } = {}) => {
     if (sock.data.code) return;
     name = String(name || '').trim().slice(0, 16) || 'Joueur';
     const code = String(room || '').trim().toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 20) || 'salon';
     let r = rooms.get(code);
-    if (!r) rooms.set(code, (r = newRoom()));
+    if (!r) rooms.set(code, (r = mode === 'c' ? newCRoom() : newRoom()));
+    if (r.mode === 'c' && Object.keys(r.pl).length >= 8) return sock.emit('err', 'Salon plein (8 joueurs max)');
     sock.join(code);
     sock.data = { code, me: null };
+    if (r.mode === 'c') {
+      const pl = newPlayer(sock.id, name, 0);
+      pl.ci = r.ci++ % 8;
+      r.pl[sock.id] = sock.data.me = pl;
+      sock.emit('joined', { side: 0, room: code, mode: 'c', id: sock.id });
+      sock.emit('map', mapOf(r));
+      return;
+    }
     const side = r.players.indexOf(null);
     if (side >= 0) r.players[side] = sock.data.me = newPlayer(sock.id, name, side);
     else r.spect.push({ id: sock.id, name });
-    sock.emit('joined', { side, room: code });
+    sock.emit('joined', { side, room: code, mode: 'm', id: sock.id });
   });
 
   sock.on('in', d => {
@@ -160,6 +249,7 @@ io.on('connection', sock => {
     const { code, me } = sock.data;
     const r = rooms.get(code);
     if (!r) return;
+    if (r.mode === 'c') { leaveRoom(sock); return sock.emit('left'); }
     const other = me ? r.players[1 - me.side] : null;
     if (other) {
       r.cancelFrom = me.side;
@@ -174,7 +264,7 @@ io.on('connection', sock => {
   sock.on('answer', ok => {
     const { code, me } = sock.data;
     const r = rooms.get(code);
-    if (!r || !me || r.cancelFrom !== 1 - me.side) return;
+    if (!r || r.mode === 'c' || !me || r.cancelFrom !== 1 - me.side) return;
     const asker = r.players[1 - me.side];
     r.cancelFrom = -1;
     if (!asker) return;
@@ -184,6 +274,37 @@ io.on('connection', sock => {
         if (k) { leaveRoom(k); k.emit('left'); }
       }
     } else io.to(asker.id).emit('refused');
+  });
+
+  // ----- édition de la map (mode créatif) -----
+  sock.on('add', d => {
+    const r = croom(sock); if (!r || !d) return;
+    if (d.t === 'b') { if (r.balls.length < 10) r.balls.push(mkBall(r, d.x, d.y)); }
+    else if (r.objs.length < 60) { const o = mkObj(r, d); if (o) r.objs.push(o); }
+    sendMap(r, sock.data.code);
+  });
+  sock.on('del', d => {
+    const r = croom(sock); if (!r || !d) return;
+    r.objs = r.objs.filter(o => o.id !== d.id);
+    r.balls = r.balls.filter(b => b.id !== d.id);
+    sendMap(r, sock.data.code);
+  });
+  sock.on('reset', () => {
+    const r = croom(sock); if (!r) return;
+    for (const b of r.balls) { b.x = b.sx; b.y = b.sy; b.vx = b.vy = 0; }
+    r.score = 0;
+  });
+  sock.on('clear', () => {
+    const r = croom(sock); if (!r) return;
+    r.objs = []; r.balls = []; r.score = 0;
+    sendMap(r, sock.data.code);
+  });
+  sock.on('load', d => {
+    const r = croom(sock); if (!r || !d) return;
+    r.objs = (Array.isArray(d.o) ? d.o.slice(0, 60) : []).map(o => mkObj(r, o)).filter(Boolean);
+    r.balls = (Array.isArray(d.b) ? d.b.slice(0, 10) : []).map(b => Array.isArray(b) ? mkBall(r, b[0], b[1]) : null).filter(Boolean);
+    r.score = 0;
+    sendMap(r, sock.data.code);
   });
 
   sock.on('disconnect', () => leaveRoom(sock));
