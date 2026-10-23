@@ -15,6 +15,7 @@ const PR = 14;          // rayon de la balle
 const HW = 65, HH = 8;  // demi-longueur / demi-épaisseur de la barre
 const WIN = 7, SPIN = 4.5, MAXV = 1600, REST = 0.92;
 const rooms = new Map();
+const BASE = 0.9; // vitesse de balle "normale" (x1.0) : 0.9 = un cran de moins qu'avant
 const WL0 = HK.BORDERS.concat(HK.CL0), WL1 = HK.BORDERS.concat(HK.CL1);
 
 const rot = (x, y, a) => [x * Math.cos(a) - y * Math.sin(a), x * Math.sin(a) + y * Math.cos(a)];
@@ -64,14 +65,14 @@ function step(r, dt) {
     r.freeze -= dt;
     if (r.freeze <= 0) { if (r.winner >= 0) { r.score = [0, 0]; r.winner = -1; } r.msg = ''; }
   }
-  const n = Math.max(4, Math.ceil(4 * r.spd)), s = dt / n;
+  const n = Math.max(4, Math.ceil(4 * r.spd * BASE)), s = dt / n;
   const active = r.freeze <= 0 && (r.players[0] || r.players[1]);
   for (let i = 0; i < n; i++) {
     for (const pl of r.players) if (pl) HK.stepPaddle(pl, pl.tx, pl.ty, pl.r, pl.t, pl.side === 0 ? WL0 : WL1, s, SPIN);
     if (!active) continue;
     const p = r.puck;
-    p.x += p.vx * s * r.spd; p.y += p.vy * s * r.spd;
-    p.vx *= 1 - 0.35 * s * r.spd; p.vy *= 1 - 0.35 * s * r.spd;
+    p.x += p.vx * s * r.spd * BASE; p.y += p.vy * s * r.spd * BASE;
+    p.vx *= 1 - 0.35 * s * r.spd * BASE; p.vy *= 1 - 0.35 * s * r.spd * BASE;
     for (const pl of r.players) if (pl) hit(p, pl);
     // murs
     if (p.y < PR) { p.y = PR; p.vy = Math.abs(p.vy) * 0.95; }
@@ -117,13 +118,13 @@ function bump(b, o) {
   if (vn < 500) { b.vx += nx * (500 - vn); b.vy += ny * (500 - vn); }
 }
 function cstep(r, dt) {
-  const n = Math.max(4, Math.ceil(4 * r.spd)), s = dt / n, P = Object.values(r.pl), B = r.balls;
+  const n = Math.max(4, Math.ceil(4 * r.spd * BASE)), s = dt / n, P = Object.values(r.pl), B = r.balls;
   const wl = HK.BORDERS.concat(r.objs.filter(o => o.t === 'w').map(o => ({ x: o.x, y: o.y, a: o.a, hw: o.s / 2, hh: 8, f: true })));
   for (let i = 0; i < n; i++) {
     for (const pl of P) HK.stepPaddle(pl, pl.tx, pl.ty, pl.r, pl.t, wl, s, SPIN);
     for (const b of B) {
-      b.x += b.vx * s * r.spd; b.y += b.vy * s * r.spd;
-      b.vx *= 1 - 0.25 * s * r.spd; b.vy *= 1 - 0.25 * s * r.spd;
+      b.x += b.vx * s * r.spd * BASE; b.y += b.vy * s * r.spd * BASE;
+      b.vx *= 1 - 0.25 * s * r.spd * BASE; b.vy *= 1 - 0.25 * s * r.spd * BASE;
       for (const pl of P) hit(b, pl);
       for (const o of r.objs) {
         if (o.t === 'w') box(b, o.x, o.y, o.a, o.s / 2, 8, 0, 0, 0, 0.9);
