@@ -34,6 +34,7 @@
   <input id="name" placeholder="Ton pseudo" maxlength="16">
   <input id="room" placeholder="Code du salon (ex: les-potes)" maxlength="20">
   <select id="mode"><option value="m">Match 1v1</option><option value="c">Mode créatif (map libre, jusqu'à 8 joueurs)</option></select>
+  <select id="opp"><option value="">Adversaire : un pote en ligne</option><option value="easy">Adversaire : bot facile</option><option value="normal">Adversaire : bot normal</option><option value="hard">Adversaire : bot difficile</option></select>
   <select id="variant"><option value="0">Basique (vitesse de balle normale)</option><option value="1">Fun (vitesse de la balle réglable)</option></select>
   <button id="go">Jouer</button>
   <small style="color:#9db4c8;text-align:center">Envoie le même code (ou le lien) à ton pote pour jouer ensemble.</small>
@@ -68,6 +69,7 @@ const cv = $('cv'), c = cv.getContext('2d');
 const params = new URLSearchParams(location.search);
 $('name').value = localStorage.getItem('pseudo') || '';
 $('room').value = params.get('room') || '';
+$('mode').onchange = () => { $('opp').style.display = $('mode').value === 'c' ? 'none' : ''; };
 
 let sock, S = null, side = -1, roomCode = '';
 const mouse = { x: W / 2, y: H / 2 }, keys = { z: false, e: false, t: false };
@@ -198,7 +200,7 @@ $('go').onclick = () => {
   const name = $('name').value.trim() || 'Joueur';
   const room = $('room').value.trim() || 'salon';
   localStorage.setItem('pseudo', name);
-  joinInfo = { name, room, mode: $('mode').value, fun: $('variant').value === '1' };
+  joinInfo = { name, room, mode: $('mode').value, fun: $('variant').value === '1', bot: $('mode').value === 'c' ? '' : $('opp').value };
   if (sock) { sock.emit('join', joinInfo); return; }
   sock = io({ transports: ['websocket'] });
   sock.on('connect', () => { if (joinInfo) sock.emit('join', joinInfo); });
@@ -273,7 +275,7 @@ function draw() {
   const now = performance.now(), dt = Math.min(0.05, (now - last) / 1000); last = now;
   updateMe(dt);
   const S = mode === 'c' ? viewC() : view();
-  const lbl = (mode === 'c' || side < 0 || !S || !S.pl[0] || !S.pl[1]) ? 'Retour au lobby' : "Demander l'annulation";
+  const lbl = (mode === 'c' || side < 0 || !S || !S.pl[0] || !S.pl[1] || S.bt) ? 'Retour au lobby' : "Demander l'annulation";
   if ($('leave').textContent !== lbl) $('leave').textContent = lbl;
   if (mode === 'c') { drawC(S); return; }
   c.clearRect(0, 0, cv.width, cv.height);

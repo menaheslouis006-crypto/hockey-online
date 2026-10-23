@@ -156,17 +156,57 @@ const csnap = r => ({
   sc: r.score,
 });
 
+// ================= BOT (1v1 contre l'ordinateur) =================
+const BOTS = {
+  easy:   { n: 'facile',    v: 380,  noise: 45, pred: false },
+  normal: { n: 'normal',    v: 650,  noise: 20, pred: true },
+  hard:   { n: 'difficile', v: 1000, noise: 8,  pred: true },
+};
+function newBot(level) {
+  const b = newPlayer('bot', '🤖 Bot ' + BOTS[level].n, 1);
+  return Object.assign(b, { bot: BOTS[level], mx: b.x, my: b.y, nx: 0, ny: 0, nt: 0, t: true, r: 0 });
+}
+const fold = y => { const hh = H - 2 * PR; let q = (y - PR) % (2 * hh); if (q < 0) q += 2 * hh; if (q > hh) q = 2 * hh - q; return q + PR; };
+function botThink(r, dt) {
+  const b = r.players[1];
+  if (!b || !b.bot) return;
+  const P = b.bot, p = r.puck, k = r.spd * BASE;
+  const vx = p.vx * k, vy = p.vy * k, sp = Math.hypot(vx, vy);
+  b.nt -= dt;
+  if (b.nt <= 0) { b.nt = 0.4; b.nx = (Math.random() - 0.5) * 2 * P.noise; b.ny = (Math.random() - 0.5) * 2 * P.noise; }
+  const home = W - 90;
+  let gx, gy;
+  if (p.x > W / 2 - 30 && (sp < 350 || Math.hypot(b.x - p.x, b.y - p.y) < 170)) {
+    // attaque : se place derrière la balle puis la pousse vers le but adverse (à gauche)
+    if (b.x < p.x + 25) { gx = p.x + 70; gy = p.y + (p.y < H / 2 ? 70 : -70); }
+    else { gx = p.x - 25; gy = p.y; }
+  } else {
+    // défense : reste devant son but, anticipe la trajectoire (rebonds compris) selon le niveau
+    gy = P.pred && vx > 5 ? fold(p.y + vy * ((home - p.x) / vx)) : H / 2 + (p.y - H / 2) * 0.5;
+    gx = home; gy = clamp(gy, GT - 40, GB + 40);
+  }
+  gx += b.nx; gy += b.ny;
+  let dx = gx - b.mx, dy = gy - b.my;
+  const d = Math.hypot(dx, dy), m = P.v * dt;
+  if (d > m) { dx *= m / d; dy *= m / d; }
+  b.mx += dx; b.my += dy;
+  const lag = Math.hypot(b.mx - b.x, b.my - b.y);
+  if (lag > 120) { b.mx = b.x + (b.mx - b.x) * 120 / lag; b.my = b.y + (b.my - b.y) * 120 / lag; }
+  b.tx = b.mx; b.ty = b.my;
+}
+
 function snap(r) {
   return {
     p: [f(r.puck.x), f(r.puck.y)],
     pl: r.players.map(q => q && [f(q.x), f(q.y), Math.round(q.a * 100) / 100, q.name]),
-    sc: r.score, fr: r.freeze > 0, w: r.winner, m: r.msg, sp: r.spect.length,
+    sc: r.score, fr: r.freeze > 0, w: r.winner, m: r.msg, sp: r.spect.length, bt: r.botRoom ? 1 : 0,
   };
 }
 
 setInterval(() => {
   for (const [code, r] of rooms) {
     if (r.mode === 'c') { cstep(r, 1 / 60); io.to(code).emit('c', csnap(r)); continue; }
+    if (r.botRoom) botThink(r, 1 / 60);
     step(r, 1 / 60);
     io.to(code).emit('s', snap(r));
   }
@@ -178,6 +218,7 @@ function leaveRoom(sock) {
   const r = rooms.get(code);
   if (!r) return;
   sock.leave(code);
+  if (r.botRoom) { rooms.delete(code); return; }
   if (r.mode === 'c') { delete r.pl[sock.id]; if (!Object.keys(r.pl).length) rooms.delete(code); return; }
   r.spect = r.spect.filter(x => x.id !== sock.id);
   r.cancelFrom = -1;
@@ -198,12 +239,18 @@ function leaveRoom(sock) {
 }
 
 io.on('connection', sock => {
-  sock.on('join', ({ name, room, mode, fun } = {}) => {
+  sock.on('join', ({ name, room, mode, fun, bot } = {}) => {
     if (sock.data.code) return;
     name = String(name || '').trim().slice(0, 16) || 'Joueur';
-    const code = String(room || '').trim().toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 20) || 'salon';
+    let code = String(room || '').trim().toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 20) || 'salon';
+    const vsBot = mode !== 'c' && BOTS[bot];
+    if (vsBot) code = 'bot-' + sock.id; // salon privé : toi contre le bot
     let r = rooms.get(code);
-    if (!r) rooms.set(code, (r = mode === 'c' ? newCRoom(fun) : newRoom(fun)));
+    if (!r) {
+      r = mode === 'c' ? newCRoom(fun) : newRoom(fun);
+      if (vsBot) { r.botRoom = true; r.players[1] = newBot(bot); }
+      rooms.set(code, r);
+    }
     if (r.mode === 'c' && Object.keys(r.pl).length >= 8) return sock.emit('err', 'Salon plein (8 joueurs max)');
     sock.join(code);
     sock.data = { code, me: null };
@@ -237,7 +284,7 @@ io.on('connection', sock => {
     if (!r) return;
     if (r.mode === 'c') { leaveRoom(sock); return sock.emit('left'); }
     const other = me ? r.players[1 - me.side] : null;
-    if (other) {
+    if (other && !other.bot) {
       r.cancelFrom = me.side;
       io.to(other.id).emit('ask', { name: me.name });
       sock.emit('wait');
