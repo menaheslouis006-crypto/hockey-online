@@ -14,6 +14,8 @@ const rot = (x, y, a) => [x * Math.cos(a) - y * Math.sin(a), x * Math.sin(a) + y
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const f = n => Math.round(n * 10) / 10;
 const reset = r => { r.puck = { x: W / 2, y: H / 2, vx: 0, vy: 0 }; };
+// Nombre de sous-pas : barre (3000 px/s + rotation) + balle au maximum, jamais plus de ~10 px par sous-pas -> plus de traversée, même à bas FPS
+const subs = (dt, k) => clamp(Math.ceil(((3300 + MAXV * k) * dt) / 10), 4, 40);
 
 function newRoom(fun) {
   const r = { players: [null, null], spect: [], score: [0, 0], freeze: 0, winner: -1, msg: '', cancelFrom: -1, fun: !!fun, spd: 1 };
@@ -57,7 +59,7 @@ function step(r, dt) {
     r.freeze -= dt;
     if (r.freeze <= 0) { if (r.winner >= 0) { r.score = [0, 0]; r.winner = -1; } r.msg = ''; }
   }
-  const n = Math.max(4, Math.ceil(4 * r.spd * BASE)), s = dt / n;
+  const n = subs(dt, r.spd * BASE), s = dt / n;
   const active = r.freeze <= 0 && (r.players[0] || r.players[1]);
   for (let i = 0; i < n; i++) {
     for (const pl of r.players) if (pl) HK.stepPaddle(pl, pl.tx, pl.ty, pl.r, pl.t, pl.side === 0 ? WL0 : WL1, s, SPIN);
@@ -108,7 +110,7 @@ function bump(b, o) {
   if (vn < 500) { b.vx += nx * (500 - vn); b.vy += ny * (500 - vn); }
 }
 function cstep(r, dt) {
-  const n = Math.max(4, Math.ceil(4 * r.spd * BASE)), s = dt / n, P = Object.values(r.pl), B = r.balls;
+  const n = subs(dt, r.spd * BASE), s = dt / n, P = Object.values(r.pl), B = r.balls;
   const wl = HK.BORDERS.concat(r.objs.filter(o => o.t === 'w').map(o => ({ x: o.x, y: o.y, a: o.a, hw: o.s / 2, hh: 8, f: true })));
   for (let i = 0; i < n; i++) {
     for (const pl of P) HK.stepPaddle(pl, pl.tx, pl.ty, pl.r, pl.t, wl, s, SPIN);

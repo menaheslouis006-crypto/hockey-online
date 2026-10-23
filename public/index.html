@@ -110,7 +110,8 @@ function updateMe(dt) {
   const wl = mode === 'c'
     ? HK.BORDERS.concat(MAP.o.filter(o => o.t === 'w').map(o => ({ x: o.x, y: o.y, a: o.a, hw: o.s / 2, hh: 8, f: true })))
     : HK.BORDERS.concat(side === 0 ? HK.CL0 : HK.CL1);
-  for (let i = 0; i < 4; i++) HK.stepPaddle(me, mouse.x, mouse.y, r, keys.t, wl, dt / 4, SPIN);
+  const n = Math.max(4, Math.min(30, Math.ceil(3000 * dt / 8)));
+  for (let i = 0; i < n; i++) HK.stepPaddle(me, mouse.x, mouse.y, r, keys.t, wl, dt / n, SPIN);
   if (r || keys.t) me.last = now;
   // au repos, on se recale doucement sur le serveur pour éviter toute dérive
   const L = buf.length ? buf[buf.length - 1].s.pl : null;
@@ -145,12 +146,16 @@ function startLocal(name, md, fn, level) {
 }
 
 function tickLocal(dt) {
-  dt = Math.max(0.001, Math.min(dt, 1 / 30));
+  dt = Math.min(dt, 0.1);
   const r = local, rd = (keys.e ? 1 : 0) - (keys.z ? 1 : 0);
   const p = r.mode === 'c' ? r.pl.me : r.players[0];
   p.tx = mouse.x; p.ty = mouse.y; p.r = rd; p.t = keys.t;
-  if (r.mode === 'c') { EN.cstep(r, dt); r.S = EN.csnap(r); }
-  else { if (r.botRoom) EN.botThink(r, dt); EN.step(r, dt); r.S = EN.snap(r); }
+  while (dt > 1e-6) { // petits pas de 1/60 s max : le jeu reste précis même si l'écran tourne à 20 images/s
+    const d = Math.min(dt, 1 / 60); dt -= d;
+    if (r.mode === 'c') EN.cstep(r, d);
+    else { if (r.botRoom) EN.botThink(r, d); EN.step(r, d); }
+  }
+  r.S = r.mode === 'c' ? EN.csnap(r) : EN.snap(r);
 }
 
 // envoie une action d'édition au serveur (en ligne) ou l'applique tout de suite (hors ligne)
