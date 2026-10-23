@@ -56,6 +56,7 @@
 <div id="ask"><div class="box"><p id="askText"></p><div style="display:flex;gap:10px;justify-content:center"><button id="yes">Accepter</button><button id="no" style="background:#555">Refuser</button></div></div></div>
 
 <script src="/socket.io/socket.io.js"></script>
+<script src="/shared.js"></script>
 <script>
 const W = 1000, H = 600, M = 40, GOAL = 180, GT = (H - GOAL) / 2, PR = 14, HW = 65, HH = 8;
 const $ = id => document.getElementById(id);
@@ -88,15 +89,17 @@ function view() {
 // Ta propre barre est calculée en local : zéro délai pour toi
 function updateMe(dt) {
   if (!me) return;
-  const lo = mode === 'c' || side === 0 ? 20 : W / 2 + 10, hi = mode === 'c' ? W - 20 : side === 0 ? W / 2 - 10 : W - 20;
-  const tx = Math.min(hi, Math.max(lo, mouse.x)), ty = Math.min(H - 20, Math.max(20, mouse.y));
-  let dx = tx - me.x, dy = ty - me.y; const d = Math.hypot(dx, dy), m = 3000 * dt;
-  if (d > m) { dx *= m / d; dy *= m / d; }
-  me.x += dx; me.y += dy;
   const r = (keys.e ? 1 : 0) - (keys.z ? 1 : 0), now = performance.now();
-  if (keys.t) { me.a = HALF; me.last = now; }
-  else if (r) { me.a += r * SPIN * dt; me.last = now; }
-  else if (now - (me.last || 0) > 600 && buf.length) { const L = buf[buf.length - 1].s.pl, l = mode === 'c' ? L.find(q => q[4] === myId) : L[side]; if (l) me.a += angDiff(me.a, l[2]) * 0.1; }
+  const wl = mode === 'c'
+    ? HK.BORDERS.concat(MAP.o.filter(o => o.t === 'w').map(o => ({ x: o.x, y: o.y, a: o.a, hw: o.s / 2, hh: 8, f: true })))
+    : HK.BORDERS.concat(side === 0 ? HK.CL0 : HK.CL1);
+  for (let i = 0; i < 4; i++) HK.stepPaddle(me, mouse.x, mouse.y, r, keys.t, wl, dt / 4, SPIN);
+  if (r || keys.t) me.last = now;
+  // au repos, on se recale doucement sur le serveur pour éviter toute dérive
+  const L = buf.length ? buf[buf.length - 1].s.pl : null;
+  const l = L && (mode === 'c' ? L.find(q => q[4] === myId) : L[side]);
+  if (l && now - (me.last || 0) > 600) me.a += angDiff(me.a, l[2]) * 0.1;
+  if (l && now - (mouse.t || 0) > 600) { me.x += (l[0] - me.x) * 0.1; me.y += (l[1] - me.y) * 0.1; }
 }
 
 let joinInfo = null, mode = 'm', myId = null, edit = false, tool = 'w', MAP = { o: [], b: [] };
@@ -244,6 +247,7 @@ function setMouse(e) {
   const r = cv.getBoundingClientRect(), k = cv.width / r.width;
   mouse.x = (e.clientX - r.left) * k - M;
   mouse.y = (e.clientY - r.top) * k - M;
+  mouse.t = performance.now();
 }
 cv.addEventListener('pointermove', setMouse);
 cv.addEventListener('pointerdown', e => { setMouse(e); if (mode === 'c' && edit) place(); });

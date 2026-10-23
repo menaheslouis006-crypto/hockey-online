@@ -1,6 +1,7 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
+const HK = require('./public/shared.js');
 
 const app = express();
 const server = http.createServer(app);
@@ -14,6 +15,7 @@ const PR = 14;          // rayon de la balle
 const HW = 65, HH = 8;  // demi-longueur / demi-épaisseur de la barre
 const WIN = 7, SPIN = 4.5, MAXV = 1600, REST = 0.92;
 const rooms = new Map();
+const WL0 = HK.BORDERS.concat(HK.CL0), WL1 = HK.BORDERS.concat(HK.CL1);
 
 const rot = (x, y, a) => [x * Math.cos(a) - y * Math.sin(a), x * Math.sin(a) + y * Math.cos(a)];
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -65,16 +67,7 @@ function step(r, dt) {
   const n = 4, s = dt / n;
   const active = r.freeze <= 0 && (r.players[0] || r.players[1]);
   for (let i = 0; i < n; i++) {
-    for (const pl of r.players) if (pl) {
-      const lo = pl.side === 0 ? 20 : W / 2 + 10, hi = pl.side === 0 ? W / 2 - 10 : W - 20;
-      const tx = clamp(pl.tx, lo, hi), ty = clamp(pl.ty, 20, H - 20);
-      let dx = tx - pl.x, dy = ty - pl.y;
-      const d = Math.hypot(dx, dy), m = 3000 * s;
-      if (d > m) { dx *= m / d; dy *= m / d; }
-      pl.vx = dx / s; pl.vy = dy / s; pl.x += dx; pl.y += dy;
-      pl.w = pl.r * SPIN; pl.a += pl.w * s;
-      if (pl.t) { pl.a = Math.PI / 2; pl.w = 0; }
-    }
+    for (const pl of r.players) if (pl) HK.stepPaddle(pl, pl.tx, pl.ty, pl.r, pl.t, pl.side === 0 ? WL0 : WL1, s, SPIN);
     if (!active) continue;
     const p = r.puck;
     p.x += p.vx * s; p.y += p.vy * s;
@@ -114,15 +107,6 @@ const mapOf = r => ({ o: r.objs, b: r.balls.map(b => [b.id, b.sx, b.sy]) });
 const sendMap = (r, code) => io.to(code).emit('map', mapOf(r));
 const croom = sock => { const r = rooms.get(sock.data.code); return r && r.mode === 'c' ? r : null; };
 
-function mvp(pl, s) {
-  const tx = clamp(pl.tx, 20, W - 20), ty = clamp(pl.ty, 20, H - 20);
-  let dx = tx - pl.x, dy = ty - pl.y;
-  const d = Math.hypot(dx, dy), m = 3000 * s;
-  if (d > m) { dx *= m / d; dy *= m / d; }
-  pl.vx = dx / s; pl.vy = dy / s; pl.x += dx; pl.y += dy;
-  pl.w = pl.r * SPIN; pl.a += pl.w * s;
-  if (pl.t) { pl.a = Math.PI / 2; pl.w = 0; }
-}
 function bump(b, o) {
   const dx = b.x - o.x, dy = b.y - o.y, d = Math.hypot(dx, dy), m = PR + o.s;
   if (d >= m || d < 1e-6) return;
@@ -134,8 +118,9 @@ function bump(b, o) {
 }
 function cstep(r, dt) {
   const n = 4, s = dt / n, P = Object.values(r.pl), B = r.balls;
+  const wl = HK.BORDERS.concat(r.objs.filter(o => o.t === 'w').map(o => ({ x: o.x, y: o.y, a: o.a, hw: o.s / 2, hh: 8, f: true })));
   for (let i = 0; i < n; i++) {
-    for (const pl of P) mvp(pl, s);
+    for (const pl of P) HK.stepPaddle(pl, pl.tx, pl.ty, pl.r, pl.t, wl, s, SPIN);
     for (const b of B) {
       b.x += b.vx * s; b.y += b.vy * s;
       b.vx *= 1 - 0.25 * s; b.vy *= 1 - 0.25 * s;
