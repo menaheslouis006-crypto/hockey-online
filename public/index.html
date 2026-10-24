@@ -99,7 +99,7 @@ function view() {
   const A = buf[0], B = buf[1];
   const k = Math.max(0, Math.min(1, (rt - A.t) / (B.t - A.t)));
   return { ...B.s,
-    p: [lerp(A.s.p[0], B.s.p[0], k), lerp(A.s.p[1], B.s.p[1], k)],
+    p: [lerp(A.s.p[0], B.s.p[0], k), lerp(A.s.p[1], B.s.p[1], k), lerp(A.s.p[2] || 0, B.s.p[2] || 0, k)],
     pl: B.s.pl.map((q, i) => { const a = A.s.pl[i]; return q && a ? [lerp(a[0], q[0], k), lerp(a[1], q[1], k), a[2] + angDiff(a[2], q[2]) * k, q[3]] : q; }) };
 }
 
@@ -172,7 +172,23 @@ function viewC() {
   const A = buf[0], B = buf[1], k = Math.max(0, Math.min(1, (rt - A.t) / (B.t - A.t)));
   return { ...B.s,
     pl: B.s.pl.map(q => { const a = A.s.pl.find(z => z[4] === q[4]); return a ? [lerp(a[0], q[0], k), lerp(a[1], q[1], k), a[2] + angDiff(a[2], q[2]) * k, q[3], q[4], q[5]] : q; }),
-    b: B.s.b.map(q => { const a = A.s.b.find(z => z[0] === q[0]); return a ? [q[0], lerp(a[1], q[1], k), lerp(a[2], q[2], k)] : q; }) };
+    b: B.s.b.map(q => { const a = A.s.b.find(z => z[0] === q[0]); return a ? [q[0], lerp(a[1], q[1], k), lerp(a[2], q[2], k), lerp(a[3] || 0, q[3] || 0, k)] : q; }) };
+}
+
+const trails = {};
+function drawTrail(key, x, y) {
+  const now = performance.now(), t = trails[key] || (trails[key] = []), l = t[t.length - 1];
+  if (l && Math.hypot(l[0] - x, l[1] - y) > 120) t.length = 0;
+  if (!l || Math.hypot(l[0] - x, l[1] - y) > 2) t.push([x, y, now]);
+  while (t.length && now - t[0][2] > 220) t.shift();
+  c.save(); c.shadowBlur = 0; c.fillStyle = '#9fd3ff';
+  for (const q of t) { const k = 1 - (now - q[2]) / 220; c.globalAlpha = 0.25 * k; c.beginPath(); c.arc(q[0], q[1], PR * (0.5 + 0.5 * k), 0, Math.PI * 2); c.fill(); }
+  c.restore();
+}
+function ballMark(x, y, an) {
+  c.save(); c.shadowBlur = 0; c.translate(x, y); c.rotate(an || 0);
+  c.strokeStyle = '#12293d'; c.lineWidth = 3; c.beginPath(); c.moveTo(-PR + 3, 0); c.lineTo(PR - 3, 0); c.stroke();
+  c.restore();
 }
 
 function drawObj(o, alpha) {
@@ -202,7 +218,7 @@ function drawC(S) {
       text(q[3], x, y - 80, 15, '#ffffffaa');
     });
     c.fillStyle = '#fff'; c.shadowColor = '#fff'; c.shadowBlur = 14;
-    for (const b of S.b) { c.beginPath(); c.arc(b[1], b[2], PR, 0, Math.PI * 2); c.fill(); }
+    for (const b of S.b) { drawTrail(b[0], b[1], b[2]); c.beginPath(); c.arc(b[1], b[2], PR, 0, Math.PI * 2); c.fill(); ballMark(b[1], b[2], b[3]); }
     c.shadowBlur = 0;
     text('Cibles touchées : ' + S.sc, W / 2, -12, 22, '#e8f1f8');
   }
@@ -359,7 +375,9 @@ function draw() {
     });
     // balle
     c.fillStyle = '#fff'; c.shadowColor = '#fff'; c.shadowBlur = 14;
+    drawTrail('p', S.p[0], S.p[1]);
     c.beginPath(); c.arc(S.p[0], S.p[1], PR, 0, Math.PI * 2); c.fill();
+    ballMark(S.p[0], S.p[1], S.p[2]);
     c.shadowBlur = 0;
     // score
     const n0 = S.pl[0] ? S.pl[0][3] : '…', n1 = S.pl[1] ? S.pl[1][3] : '…';

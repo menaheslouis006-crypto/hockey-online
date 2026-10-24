@@ -13,7 +13,9 @@ const WL0 = HK.BORDERS.concat(HK.CL0), WL1 = HK.BORDERS.concat(HK.CL1);
 const rot = (x, y, a) => [x * Math.cos(a) - y * Math.sin(a), x * Math.sin(a) + y * Math.cos(a)];
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const f = n => Math.round(n * 10) / 10;
-const reset = r => { r.puck = { x: W / 2, y: H / 2, vx: 0, vy: 0 }; };
+const reset = r => { r.puck = { x: W / 2, y: H / 2, vx: 0, vy: 0, om: 0, an: 0 }; };
+// Physique "fun" : frottement barre/balle (la balle est entraînée par la barre qui glisse) + effet (rotation) qui fait courber la balle
+const MU = 0.45, OMAX = 70, MAGNUS = 0.012;
 // Nombre de sous-pas : barre (3000 px/s + rotation) + balle au maximum, jamais plus de ~10 px par sous-pas -> plus de traversée, même à bas FPS
 const subs = (dt, k) => clamp(Math.ceil(((3300 + MAXV * k) * dt) / 10), 4, 40);
 
@@ -28,7 +30,7 @@ function newPlayer(id, name, side) {
 }
 
 // Collision balle (cercle) <-> boîte tournante (barre de joueur ou mur de la map)
-function box(p, x, y, a, hw, hh, bvx, bvy, w, e) {
+function box(p, x, y, a, hw, hh, bvx, bvy, w, e, mu = MU) {
   const [lx, ly] = rot(p.x - x, p.y - y, -a);
   const cx = clamp(lx, -hw, hw), cy = clamp(ly, -hh, hh);
   let dx = lx - cx, dy = ly - cy, d = Math.hypot(dx, dy);
@@ -36,13 +38,28 @@ function box(p, x, y, a, hw, hh, bvx, bvy, w, e) {
   if (d < 1e-6) { dx = lx; dy = ly; d = Math.hypot(dx, dy) || 1; }
   const [nx, ny] = rot(dx / d, dy / d, a);
   const [rx, ry] = rot(cx, cy, a);
-  const vx = bvx - w * ry, vy = bvy + w * rx;
+  const vx = bvx - w * ry, vy = bvy + w * rx; // vitesse du point de contact sur la barre (déplacement + rotation)
   p.x += nx * (PR - d);
   p.y += ny * (PR - d);
   const vn = (p.vx - vx) * nx + (p.vy - vy) * ny;
-  if (vn < 0) { p.vx -= (1 + e) * vn * nx; p.vy -= (1 + e) * vn * ny; }
+  if (vn < 0) {
+    const jn = -(1 + e) * vn;                   // choc (direction normale)
+    p.vx += jn * nx; p.vy += jn * ny;
+    const tx = -ny, ty = nx;                    // frottement (direction du contact) : entraîne la balle et lui donne de l'effet
+    const slip = (p.vx - vx) * tx + (p.vy - vy) * ty - (p.om || 0) * PR;
+    const jt = clamp(-slip / 3, -mu * jn, mu * jn);
+    p.vx += jt * tx; p.vy += jt * ty;
+    p.om = clamp((p.om || 0) - 2 * jt / PR, -OMAX, OMAX);
+  }
   const sp = Math.hypot(p.vx, p.vy);
   if (sp > MAXV) { p.vx *= MAXV / sp; p.vy *= MAXV / sp; }
+}
+// L'effet (rotation) fait courber la trajectoire (effet Magnus) et s'use petit à petit
+function spin(p, s, k) {
+  const om = p.om || 0, ax = -MAGNUS * om * p.vy, ay = MAGNUS * om * p.vx;
+  p.vx += ax * s * k; p.vy += ay * s * k;
+  p.om = om * (1 - 0.5 * s * k);
+  p.an = (p.an || 0) + om * s * k;
 }
 const hit = (p, pl) => box(p, pl.x, pl.y, pl.a, HW, HH, pl.vx, pl.vy, pl.w, REST);
 
@@ -67,6 +84,7 @@ function step(r, dt) {
     const p = r.puck;
     p.x += p.vx * s * r.spd * BASE; p.y += p.vy * s * r.spd * BASE;
     p.vx *= 1 - 0.35 * s * r.spd * BASE; p.vy *= 1 - 0.35 * s * r.spd * BASE;
+    spin(p, s, r.spd * BASE);
     for (const pl of r.players) if (pl) hit(p, pl);
     // murs
     if (p.y < PR) { p.y = PR; p.vy = Math.abs(p.vy) * 0.95; }
@@ -90,7 +108,7 @@ function mkObj(r, d) {
 }
 function mkBall(r, x, y) {
   x = clamp(+x || W / 2, PR, W - PR); y = clamp(+y || H / 2, PR, H - PR);
-  return { id: r.nid++, x, y, vx: 0, vy: 0, sx: x, sy: y };
+  return { id: r.nid++, x, y, vx: 0, vy: 0, sx: x, sy: y, om: 0, an: 0 };
 }
 function newCRoom(fun) {
   const r = { mode: 'c', pl: {}, objs: [], balls: [], score: 0, nid: 1, ci: 0, fun: !!fun, spd: 1 };
@@ -117,11 +135,12 @@ function cstep(r, dt) {
     for (const b of B) {
       b.x += b.vx * s * r.spd * BASE; b.y += b.vy * s * r.spd * BASE;
       b.vx *= 1 - 0.25 * s * r.spd * BASE; b.vy *= 1 - 0.25 * s * r.spd * BASE;
+      spin(b, s, r.spd * BASE);
       for (const pl of P) hit(b, pl);
       for (const o of r.objs) {
-        if (o.t === 'w') box(b, o.x, o.y, o.a, o.s / 2, 8, 0, 0, 0, 0.9);
+        if (o.t === 'w') box(b, o.x, o.y, o.a, o.s / 2, 8, 0, 0, 0, 0.9, 0.15);
         else if (o.t === 'm') bump(b, o);
-        else if (Math.hypot(b.x - o.x, b.y - o.y) < o.s) { r.score++; b.x = b.sx; b.y = b.sy; b.vx = b.vy = 0; }
+        else if (Math.hypot(b.x - o.x, b.y - o.y) < o.s) { r.score++; b.x = b.sx; b.y = b.sy; b.vx = b.vy = 0; b.om = 0; }
       }
       if (b.x < PR) { b.x = PR; b.vx = Math.abs(b.vx) * 0.95; }
       if (b.x > W - PR) { b.x = W - PR; b.vx = -Math.abs(b.vx) * 0.95; }
@@ -144,7 +163,7 @@ function cstep(r, dt) {
 }
 const csnap = r => ({
   pl: Object.values(r.pl).map(q => [f(q.x), f(q.y), Math.round(q.a * 100) / 100, q.name, q.id, q.ci]),
-  b: r.balls.map(b => [b.id, f(b.x), f(b.y)]),
+  b: r.balls.map(b => [b.id, f(b.x), f(b.y), Math.round((b.an || 0) * 100) / 100]),
   sc: r.score,
 });
 
@@ -189,7 +208,7 @@ function botThink(r, dt) {
 
 function snap(r) {
   return {
-    p: [f(r.puck.x), f(r.puck.y)],
+    p: [f(r.puck.x), f(r.puck.y), Math.round((r.puck.an || 0) * 100) / 100],
     pl: r.players.map(q => q && [f(q.x), f(q.y), Math.round(q.a * 100) / 100, q.name]),
     sc: r.score, fr: r.freeze > 0, w: r.winner, m: r.msg, sp: r.spect.length, bt: r.botRoom ? 1 : 0,
   };
@@ -209,7 +228,7 @@ function edit(r, ev, d) {
     return true;
   }
   if (ev === 'reset') {
-    for (const b of r.balls) { b.x = b.sx; b.y = b.sy; b.vx = b.vy = 0; }
+    for (const b of r.balls) { b.x = b.sx; b.y = b.sy; b.vx = b.vy = 0; b.om = 0; }
     r.score = 0;
     return false;
   }
