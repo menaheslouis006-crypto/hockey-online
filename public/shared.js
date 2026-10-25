@@ -45,11 +45,11 @@
       pl.x += c.nx * c.d; pl.y += c.ny * c.d;
       if (wb.f) {
         const pen = -((tx - pl.x) * c.nx + (ty - pl.y) * c.ny); // de combien la souris est "derrière" le mur
-        if (pen > 25 && (!forced || pen > forced.pen)) forced = { nx: c.nx, ny: c.ny, pen };
+        if (pen > 4 && (!forced || pen > forced.pen)) forced = { nx: c.nx, ny: c.ny, pen };
       }
     }
     if (forced) {
-      const k = Math.min(1, (forced.pen - 25) / 120);
+      const k = Math.min(1, (forced.pen - 4) / 20);
       const tvx = -forced.ny, tvy = forced.nx;
       const tt = (tx - pl.x) * tvx + (ty - pl.y) * tvy;
       const rel = wrapPi2(pl.a - Math.atan2(tvy, tvx));

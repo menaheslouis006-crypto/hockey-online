@@ -174,7 +174,7 @@ const BOTS = {
   hard:   { n: 'difficile', v: 1000, noise: 8,  pred: true },
 };
 function newBot(level) {
-  const b = newPlayer('bot', '🤖 Bot ' + BOTS[level].n, 1);
+  const b = newPlayer('bot', 'Bot ' + BOTS[level].n, 1);
   return Object.assign(b, { bot: BOTS[level], mx: b.x, my: b.y, nx: 0, ny: 0, nt: 0, t: true, r: 0 });
 }
 const fold = y => { const hh = H - 2 * PR; let q = (y - PR) % (2 * hh); if (q < 0) q += 2 * hh; if (q > hh) q = 2 * hh - q; return q + PR; };

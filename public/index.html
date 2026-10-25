@@ -5,60 +5,135 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Air Hockey en ligne</title>
 <style>
+  @font-face { font-family: 'Barlow Condensed'; font-weight: 700; font-style: normal; font-display: swap; src: url(/fonts/barlow-condensed-latin-700-normal.woff2) format('woff2'); }
+  @font-face { font-family: 'Barlow Condensed'; font-weight: 800; font-style: normal; font-display: swap; src: url(/fonts/barlow-condensed-latin-800-normal.woff2) format('woff2'); }
+  @font-face { font-family: 'Barlow Condensed'; font-weight: 800; font-style: italic; font-display: swap; src: url(/fonts/barlow-condensed-latin-800-italic.woff2) format('woff2'); }
+  @font-face { font-family: 'Barlow'; font-weight: 400; font-style: normal; font-display: swap; src: url(/fonts/barlow-latin-400-normal.woff2) format('woff2'); }
+  @font-face { font-family: 'Barlow'; font-weight: 500; font-style: normal; font-display: swap; src: url(/fonts/barlow-latin-500-normal.woff2) format('woff2'); }
+  @font-face { font-family: 'Barlow'; font-weight: 600; font-style: normal; font-display: swap; src: url(/fonts/barlow-latin-600-normal.woff2) format('woff2'); }
+
+  :root { --page: #D9E4EA; --ice: #F3F8FA; --ink: #1E2630; --muted: #54627A; --blue: #2A5FB8; --red: #D8342C; }
   * { box-sizing: border-box; }
-  body { margin: 0; background: #0b141d; color: #e8f1f8; font-family: system-ui, sans-serif; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
-  #menu { margin-top: 12vh; display: flex; flex-direction: column; gap: 12px; width: min(360px, 90vw); }
-  h1 { margin: 0 0 8px; text-align: center; }
-  input, select, button { padding: 12px; font-size: 16px; border-radius: 8px; border: 1px solid #2c4256; background: #14263a; color: inherit; }
-  button { background: #2f7de1; border: 0; cursor: pointer; font-weight: 600; }
-  button:hover { background: #4a93f5; }
-  #spdBox { display: none; gap: 10px; align-items: center; padding: 4px 2px 8px; font-size: 14px; color: #ffd84a; }
-  #spd { padding: 0; width: min(260px, 60vw); }
-  #leave { background: #c0392b; }
-  #tools { display: none; gap: 8px; flex-wrap: wrap; padding: 4px 2px 8px; align-items: center; }
-  #tools button { padding: 6px 12px; font-size: 13px; }
-  #tools button.on { outline: 2px solid #ffd84a; }
-  #toolBtns { display: none; gap: 8px; flex-wrap: wrap; }
-  #leave:hover { background: #e04b3a; }
-  #ask { display: none; position: fixed; inset: 0; background: #000a; align-items: center; justify-content: center; z-index: 9; }
-  #ask .box { background: #14263a; padding: 24px; border-radius: 12px; text-align: center; display: flex; flex-direction: column; gap: 14px; }
-  #game { display: none; width: 100%; max-width: 1080px; padding: 8px; }
-  canvas { width: 100%; height: auto; display: block; border-radius: 10px; cursor: none; touch-action: none; }
-  #bar { display: flex; gap: 10px; align-items: center; justify-content: space-between; font-size: 14px; color: #9db4c8; padding: 8px 2px; flex-wrap: wrap; }
-  #bar button { padding: 6px 12px; font-size: 13px; }
+  html { background: var(--page); }
+  body { margin: 0; min-height: 100vh; color: var(--ink); font: 400 17px/1.45 'Barlow', system-ui, sans-serif; display: flex; flex-direction: column; align-items: center; }
+  button { font-family: inherit; }
+  :focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
+
+  /* le sol de la patinoire, derrière le lobby */
+  #floor { position: fixed; inset: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; }
+  body.playing #floor { display: none; }
+
+  /* lobby */
+  #menu { display: flex; flex-direction: column; align-self: flex-start; width: min(460px, calc(100vw - 40px)); margin: 5vh 0 40px max(20px, 9vw); }
+  #menu h1 { margin: 0 0 14px; font: italic 800 clamp(54px, min(10vw, 11vh), 92px)/0.86 'Barlow Condensed', sans-serif; letter-spacing: -0.01em; }
+  .lead { margin: 0 0 24px; max-width: 28ch; font-size: 19px; color: var(--muted); }
+  .field { margin-bottom: 14px; }
+  .row2 { display: flex; gap: 12px; flex-wrap: wrap; }
+  .row2 .field { flex: 1 1 190px; min-width: 0; }
+  .field > label, .field > .lab { display: block; margin-bottom: 6px; font-weight: 600; font-size: 15px; }
+  input[type=text] { width: 100%; height: 48px; padding: 0 14px; border: 2px solid var(--ink); border-radius: 6px; background: #fff; color: var(--ink); font: 500 18px 'Barlow', sans-serif; }
+  input[type=text]::placeholder { color: #8795A8; }
+  .seg { display: flex; border: 2px solid var(--ink); border-radius: 6px; overflow: hidden; background: #fff; }
+  .seg button { flex: 1 1 0; min-width: 0; padding: 11px 8px; border: 0; background: transparent; color: var(--ink); font: 600 16px 'Barlow', sans-serif; white-space: nowrap; cursor: pointer; }
+  .seg button + button { border-left: 2px solid var(--ink); }
+  .seg button[aria-pressed=true], .seg button.on { background: var(--ink); color: #fff; }
+  .seg button:not([aria-pressed=true]):not(.on):hover { background: #E4EDF2; }
+  #hint { min-height: 2.7em; margin: 2px 0 16px; color: var(--muted); font-size: 16px; }
+  .btn { align-self: flex-start; padding: 12px 30px 11px; border: 2px solid var(--ink); border-radius: 6px; background: var(--red); color: #fff; font: 800 28px/1 'Barlow Condensed', sans-serif; cursor: pointer; box-shadow: 0 4px 0 var(--ink); transition: transform .06s, box-shadow .06s; }
+  .btn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink); }
+  .btn2 { padding: 7px 14px; border: 2px solid var(--ink); border-radius: 6px; background: transparent; color: var(--ink); font: 600 15px 'Barlow', sans-serif; cursor: pointer; }
+  .btn2:hover { background: #fff; }
+
+  /* partie */
+  #game { position: relative; display: none; width: 100%; max-width: 1080px; padding: 10px 10px 30px; }
+  #bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; min-height: 40px; }
+  #info { color: var(--muted); font-size: 16px; }
+  #bar .actions { display: flex; gap: 8px; }
+  #score { display: flex; align-items: center; justify-content: center; gap: clamp(10px, 3vw, 26px); margin: 2px 0; font-family: 'Barlow Condensed', sans-serif; }
+  #score .side { flex: 1; display: flex; align-items: center; gap: 14px; min-width: 0; }
+  #score .l { justify-content: flex-end; color: var(--blue); }
+  #score .r { justify-content: flex-start; color: var(--red); }
+  #score .name { font-weight: 700; font-size: clamp(18px, 3.2vw, 28px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #score b { font-weight: 800; font-size: clamp(46px, 9vw, 84px); line-height: 1; font-variant-numeric: tabular-nums; color: var(--ink); }
+  #score .sep { font-weight: 800; font-size: clamp(34px, 6vw, 56px); line-height: 1; color: var(--muted); }
+  #scoreC { display: none; align-items: baseline; justify-content: center; gap: 12px; margin: 2px 0; font-family: 'Barlow Condensed', sans-serif; }
+  #scoreC span { font-weight: 700; font-size: 24px; color: var(--muted); }
+  #scoreC b { font-weight: 800; font-size: 64px; line-height: 1; font-variant-numeric: tabular-nums; }
+  #spdBox { display: none; align-items: center; gap: 12px; flex-wrap: wrap; margin: 4px 0 8px; font-weight: 600; }
+  #spd { width: min(260px, 50vw); accent-color: var(--blue); }
+  #spdVal { min-width: 3ch; font: 800 24px 'Barlow Condensed', sans-serif; }
+  #spdBox small { color: var(--muted); font-weight: 400; font-size: 15px; }
+  #tools { display: none; gap: 10px; flex-wrap: wrap; align-items: center; margin: 2px 0 8px; }
+  #toolBtns { display: none; gap: 10px; flex-wrap: wrap; align-items: center; }
+  #toolBtns .seg { flex: none; }
+  #toolBtns .seg button { flex: none; padding: 7px 14px; font-size: 15px; }
+  canvas { display: block; width: auto; height: auto; max-width: 100%; max-height: calc(100vh - 250px); min-height: 260px; margin: 0 auto; cursor: none; touch-action: none; } /* le terrain tient toujours dans la fenêtre */
+  #keys { margin: 8px 2px 0; color: var(--muted); font-size: 15px; }
+  kbd { padding: 1px 6px; border: 1.5px solid var(--ink); border-radius: 4px; background: #fff; color: var(--ink); font: 600 13px 'Barlow', sans-serif; box-shadow: 0 2px 0 var(--ink); }
+  #lockHint { position: absolute; left: 50%; top: 56%; transform: translate(-50%, -50%); display: none; z-index: 5; padding: 14px 20px; border-radius: 6px; background: var(--ink); color: #fff; font-weight: 600; font-size: 18px; line-height: 1.35; text-align: center; pointer-events: none; }
+  #lockHint small { display: block; margin-top: 2px; font-weight: 400; font-size: 15px; opacity: .8; }
+
+  /* demande d'annulation */
+  #ask { display: none; position: fixed; inset: 0; z-index: 9; padding: 20px; background: rgba(30, 38, 48, .55); align-items: center; justify-content: center; }
+  #ask .box { max-width: 380px; padding: 22px 26px; border: 2px solid var(--ink); border-radius: 8px; background: #fff; box-shadow: 0 6px 0 var(--ink); }
+  #ask p { margin: 0 0 16px; font-size: 19px; font-weight: 600; }
+  #ask .row { display: flex; gap: 10px; align-items: center; }
+  #ask .btn { padding: 9px 20px 8px; font-size: 22px; }
+
+  @media (max-width: 700px) { #floor { opacity: .55; } }
+  @media (max-width: 480px) { .seg button { padding: 10px 4px; font-size: 14px; } #toolBtns .seg button { padding: 7px 10px; } }
 </style>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%231E2630'/%3E%3Cpath d='M9 16h14' stroke='%23fff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
 </head>
 <body>
-<div id="menu">
-  <h1>🏒 Air Hockey</h1>
-  <input id="name" placeholder="Ton pseudo" maxlength="16">
-  <input id="room" placeholder="Code du salon (ex: les-potes)" maxlength="20">
-  <select id="mode"><option value="m">Match 1v1</option><option value="c">Mode créatif (map libre, jusqu'à 8 joueurs)</option></select>
-  <select id="opp"><option value="">Adversaire : un pote en ligne</option><option value="easy">Adversaire : bot facile</option><option value="normal">Adversaire : bot normal</option><option value="hard">Adversaire : bot difficile</option></select>
-  <select id="variant"><option value="0">Basique (vitesse de balle normale)</option><option value="1">Fun (vitesse de la balle réglable)</option></select>
-  <button id="go">Jouer</button>
-  <small style="color:#9db4c8;text-align:center">Envoie le même code (ou le lien) à ton pote pour jouer ensemble.</small>
-</div>
+<svg id="floor" aria-hidden="true" viewBox="0 0 1200 800" preserveAspectRatio="xMaxYMid slice">
+  <line x1="940" y1="-60" x2="940" y2="860" stroke="#D8342C" stroke-width="16" opacity=".32"/>
+  <circle cx="940" cy="400" r="270" fill="none" stroke="#2A5FB8" stroke-width="12" opacity=".32"/>
+  <circle cx="940" cy="400" r="20" fill="#D8342C" opacity=".45"/>
+</svg>
+
+<main id="menu">
+  <h1>Air<br>Hockey</h1>
+  <p class="lead">Un contre un, contre un bot, ou seul dans ta propre map.</p>
+  <div class="row2">
+    <div class="field"><label for="name">Pseudo</label><input type="text" id="name" maxlength="16" autocomplete="off" placeholder="Ton pseudo"></div>
+    <div class="field" id="roomField"><label for="room">Code du salon</label><input type="text" id="room" maxlength="20" autocomplete="off" placeholder="ex. les-potes"></div>
+  </div>
+  <div class="field"><span class="lab">Mode</span><div class="seg" id="modeSeg"></div></div>
+  <div class="field"><span class="lab" id="oppLabel">Adversaire</span><div class="seg" id="oppSeg"></div></div>
+  <div class="field"><span class="lab">Style</span><div class="seg" id="variantSeg"></div></div>
+  <p id="hint"></p>
+  <button class="btn" id="go">Jouer</button>
+  <select id="mode" hidden><option value="m">Match 1v1</option><option value="c">Créatif</option></select>
+  <select id="opp" hidden></select>
+  <select id="variant" hidden><option value="0">Basique</option><option value="1">Fun</option></select>
+</main>
 
 <div id="game">
   <div id="bar">
     <span id="info"></span>
-    <span>Souris : bouger · <b>Z</b> / <b>E</b> : tourner · <b>T</b> : barre droite</span>
-    <button id="copy">Copier le lien</button>
-    <button id="leave">Retour au lobby</button>
+    <span class="actions"><button class="btn2" id="copy">Copier le lien</button><button class="btn2" id="leave">Retour au lobby</button></span>
   </div>
-  <div id="spdBox"><span>⚡ Vitesse de la balle</span><input type="range" id="spd" min="0.5" max="3" step="0.1" value="1"><b id="spdVal">x1.0</b><small style="color:#9db4c8">(x1.0 = normale)</small></div>
+  <div id="score">
+    <div class="side l"><span class="name" id="nL"></span><b id="sL">0</b></div>
+    <span class="sep">:</span>
+    <div class="side r"><b id="sR">0</b><span class="name" id="nR"></span></div>
+  </div>
+  <div id="scoreC"><span>Cibles touchées</span><b id="sC">0</b></div>
+  <div id="spdBox"><label for="spd">Vitesse de la balle</label><input type="range" id="spd" min="0.5" max="3" step="0.1" value="1"><b id="spdVal">x1.0</b><small>x1.0 est la vitesse normale</small></div>
   <div id="tools">
-    <button id="editBtn">✏️ Éditer la map</button>
+    <button class="btn2" id="editBtn">Éditer la map</button>
     <span id="toolBtns">
-      <button data-tool="w" class="on">Mur</button><button data-tool="m">Bumper</button><button data-tool="c">Cible</button><button data-tool="b">Balle</button><button data-tool="x">Gomme</button>
-      <button id="resetBtn">Remettre les balles</button><button id="clearBtn">Tout vider</button><button id="expBtn">Exporter</button><button id="impBtn">Importer</button>
+      <span class="seg"><button data-tool="w" class="on">Mur</button><button data-tool="m">Bumper</button><button data-tool="c">Cible</button><button data-tool="b">Balle</button><button data-tool="x">Gomme</button></span>
+      <button class="btn2" id="resetBtn">Remettre les balles</button><button class="btn2" id="clearBtn">Tout vider</button><button class="btn2" id="expBtn">Exporter</button><button class="btn2" id="impBtn">Importer</button>
     </span>
   </div>
   <canvas id="cv" width="1080" height="680"></canvas>
+  <div id="lockHint">Clique sur le terrain pour prendre la souris<small>Échap pour la rendre</small></div>
+  <p id="keys">Bouge avec la souris. <kbd>Z</kbd> et <kbd>E</kbd> font tourner la barre, <kbd>T</kbd> la remet droite, <kbd>Échap</kbd> libère la souris.</p>
 </div>
 
-<div id="ask"><div class="box"><p id="askText"></p><div style="display:flex;gap:10px;justify-content:center"><button id="yes">Accepter</button><button id="no" style="background:#555">Refuser</button></div></div></div>
+<div id="ask"><div class="box"><p id="askText"></p><div class="row"><button class="btn" id="yes">Accepter</button><button class="btn2" id="no">Refuser</button></div></div></div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script src="/shared.js"></script>
@@ -71,16 +146,39 @@ const params = new URLSearchParams(location.search);
 $('name').value = localStorage.getItem('pseudo') || '';
 $('room').value = params.get('room') || '';
 const OPP = {
-  m: [['', 'Adversaire : un pote en ligne'], ['easy', 'Adversaire : bot facile (hors ligne, sans délai)'], ['normal', 'Adversaire : bot normal (hors ligne, sans délai)'], ['hard', 'Adversaire : bot difficile (hors ligne, sans délai)']],
-  c: [['', 'Avec tes potes (en ligne)'], ['solo', 'Seul (hors ligne, sans délai)']],
+  m: [['', 'Un pote'], ['easy', 'Bot facile'], ['normal', 'Bot normal'], ['hard', 'Bot difficile']],
+  c: [['', 'Des potes'], ['solo', 'Seul']],
 };
+// Les <select> cachés restent la source de vérité ; les boutons segmentés les pilotent
+function renderSeg(id) {
+  const sel = $(id), box = $(id + 'Seg');
+  box.innerHTML = '';
+  for (const o of sel.options) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.textContent = o.textContent; b.setAttribute('aria-pressed', o.value === sel.value);
+    b.onclick = () => { sel.value = o.value; renderSeg(id); if (sel.onchange) sel.onchange(); };
+    box.appendChild(b);
+  }
+}
+function hint() {
+  const m = $('mode').value, o = $('opp').value;
+  let t = m === 'm'
+    ? (o ? 'Le bot tourne dans ton navigateur, donc aucun délai.' : 'Donne le même code de salon à ton pote pour jouer ensemble.')
+    : (o ? 'Seul, hors ligne et sans délai. Tu peux exporter ta map pour la garder.' : "Pose des murs, des bumpers et des cibles avec jusqu'à 8 potes.");
+  if ($('variant').value === '1') t += ' En Fun, tu règles la vitesse de la balle pendant la partie.';
+  $('hint').textContent = t;
+}
 function fillOpp() {
-  $('opp').innerHTML = OPP[$('mode').value].map(([v, t]) => '<option value="' + v + '">' + t + '</option>').join('');
+  const cr = $('mode').value === 'c';
+  $('opp').innerHTML = OPP[cr ? 'c' : 'm'].map(([v, t]) => '<option value="' + v + '">' + t + '</option>').join('');
+  $('oppLabel').textContent = cr ? 'Avec qui' : 'Adversaire';
+  renderSeg('opp');
   $('opp').onchange();
 }
-$('opp').onchange = () => { $('room').style.display = $('opp').value ? 'none' : ''; }; // pas de code de salon hors ligne
+$('opp').onchange = () => { $('roomField').style.display = $('opp').value ? 'none' : ''; hint(); }; // pas de code de salon hors ligne
+$('variant').onchange = hint;
 $('mode').onchange = fillOpp;
-fillOpp();
+renderSeg('mode'); renderSeg('variant'); fillOpp();
 
 let sock, S = null, side = -1, roomCode = '';
 const mouse = { x: W / 2, y: H / 2 }, keys = { z: false, e: false, t: false };
@@ -112,6 +210,7 @@ function updateMe(dt) {
     : HK.BORDERS.concat(side === 0 ? HK.CL0 : HK.CL1);
   const n = Math.max(4, Math.min(30, Math.ceil(3000 * dt / 8)));
   for (let i = 0; i < n; i++) HK.stepPaddle(me, mouse.x, mouse.y, r, keys.t, wl, dt / n, SPIN);
+  leash();
   if (r || keys.t) me.last = now;
   // au repos, on se recale doucement sur le serveur pour éviter toute dérive
   const L = buf.length ? buf[buf.length - 1].s.pl : null;
@@ -122,7 +221,6 @@ function updateMe(dt) {
 
 let joinInfo = null, local = null, fun = false, mode = 'm', myId = null, edit = false, tool = 'w', MAP = { o: [], b: [] };
 const size = { w: 140, m: 30, c: 35 }, RNG = { w: [40, 400, 10], m: [12, 90, 3], c: [12, 90, 3] };
-const COLORS = ['#4aa3ff', '#ff6a5f', '#6be37a', '#ffd84a', '#c08bff', '#ff9f43', '#2ee6d6', '#ff7eb6'];
 const rot2 = (x, y, a) => [x * Math.cos(a) - y * Math.sin(a), x * Math.sin(a) + y * Math.cos(a)];
 
 // ===== Modes HORS LIGNE : la physique tourne dans ton navigateur (même moteur que le serveur), aucun délai =====
@@ -139,10 +237,10 @@ function startLocal(name, md, fn, level) {
   $('menu').style.display = 'none';
   $('game').style.display = 'block';
   $('copy').style.display = 'none';
-  $('toolBtns').style.display = 'none'; $('editBtn').textContent = '✏️ Éditer la map';
+  $('toolBtns').style.display = 'none'; $('editBtn').textContent = 'Éditer la map';
   $('tools').style.display = md === 'c' ? 'flex' : 'none';
   setSpd(1); $('spdBox').style.display = fun ? 'flex' : 'none';
-  $('info').textContent = baseInfo() + ' · hors ligne';
+  $('info').textContent = baseInfo() + ', hors ligne';
 }
 
 function tickLocal(dt) {
@@ -155,6 +253,7 @@ function tickLocal(dt) {
     if (r.mode === 'c') EN.cstep(r, d);
     else { if (r.botRoom) EN.botThink(r, d); EN.step(r, d); }
   }
+  leash();
   r.S = r.mode === 'c' ? EN.csnap(r) : EN.snap(r);
 }
 
@@ -175,58 +274,136 @@ function viewC() {
     b: B.s.b.map(q => { const a = A.s.b.find(z => z[0] === q[0]); return a ? [q[0], lerp(a[1], q[1], k), lerp(a[2], q[2], k), lerp(a[3] || 0, q[3] || 0, k)] : q; }) };
 }
 
+// ===== Rendu : une patinoire vue de dessus =====
+const C = { page: '#D9E4EA', ice: '#F3F8FA', rail: '#263140', ink: '#1E2630', red: '#D8342C', blue: '#2A5FB8', amber: '#E8A317', green: '#1E9B57' };
+const COLORS = [C.blue, C.red, C.green, C.amber, '#7B4FC2', '#E26D1F', '#17A2A2', '#C73E86'];
+const DISPLAY = '"Barlow Condensed", system-ui, sans-serif';
+
+function rr(x, y, w, h, r) { // rectangle arrondi (compatible avec tous les navigateurs)
+  c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath();
+}
+
+let iceCache = null;
+function ice() { // la glace est dessinée une seule fois : fond clair et rayures de patins
+  if (iceCache) return iceCache;
+  const o = document.createElement('canvas'); o.width = W; o.height = H;
+  const g = o.getContext('2d');
+  g.fillStyle = C.ice; g.fillRect(0, 0, W, H);
+  let s = 7; const rnd = () => (s = (s * 16807) % 2147483647) / 2147483647;
+  for (let i = 0; i < 260; i++) {
+    const x = rnd() * W, y = rnd() * H, a = rnd() * Math.PI, l = 40 + rnd() * 220;
+    g.strokeStyle = 'rgba(110,140,165,' + (0.05 + rnd() * 0.1).toFixed(3) + ')'; g.lineWidth = 0.6 + rnd();
+    g.beginPath(); g.moveTo(x, y);
+    g.quadraticCurveTo(x + Math.cos(a) * l * 0.5 + rnd() * 20, y + Math.sin(a) * l * 0.5 + rnd() * 20, x + Math.cos(a) * l, y + Math.sin(a) * l);
+    g.stroke();
+  }
+  return (iceCache = o);
+}
+
+function rink(goals) {
+  c.fillStyle = C.rail; rr(-14, -14, W + 28, H + 28, 38); c.fill(); // les bandes
+  c.save(); rr(0, 0, W, H, 28); c.clip();
+  c.drawImage(ice(), 0, 0);
+  c.strokeStyle = C.blue; c.globalAlpha = 0.5; c.lineWidth = 10;      // lignes bleues
+  c.beginPath(); c.moveTo(W * 0.3, 0); c.lineTo(W * 0.3, H); c.moveTo(W * 0.7, 0); c.lineTo(W * 0.7, H); c.stroke();
+  c.strokeStyle = C.red; c.globalAlpha = 0.7; c.lineWidth = 8;        // ligne centrale
+  c.beginPath(); c.moveTo(W / 2, 0); c.lineTo(W / 2, H); c.stroke();
+  c.strokeStyle = C.blue; c.globalAlpha = 0.55; c.lineWidth = 5;      // cercle de mise au jeu
+  c.beginPath(); c.arc(W / 2, H / 2, 74, 0, Math.PI * 2); c.stroke();
+  c.fillStyle = C.red; c.globalAlpha = 0.8; c.beginPath(); c.arc(W / 2, H / 2, 9, 0, Math.PI * 2); c.fill();
+  c.globalAlpha = 1;
+  if (goals) for (const [x, col, a0, a1] of [[0, C.blue, -Math.PI / 2, Math.PI / 2], [W, C.red, Math.PI / 2, Math.PI * 1.5]]) { // zones devant les buts
+    c.beginPath(); c.arc(x, H / 2, GOAL / 2 + 26, a0, a1); c.closePath();
+    c.fillStyle = col + '22'; c.fill(); c.strokeStyle = col; c.lineWidth = 4; c.globalAlpha = 0.7; c.stroke(); c.globalAlpha = 1;
+  }
+  c.restore();
+  if (!goals) return;
+  for (const [x0, col, post] of [[-36, C.blue, 0], [W, C.red, W]]) { // buts : filet, fond et poteaux
+    c.save(); c.beginPath(); c.rect(x0, GT, 36, GOAL); c.clip();
+    c.fillStyle = '#18202B'; c.fillRect(x0, GT, 36, GOAL);
+    c.strokeStyle = 'rgba(255,255,255,.16)'; c.lineWidth = 1; c.beginPath();
+    for (let i = -GOAL; i < 36 + GOAL; i += 10) { c.moveTo(x0 + i, GT); c.lineTo(x0 + i + GOAL, GT + GOAL); c.moveTo(x0 + i + GOAL, GT); c.lineTo(x0 + i, GT + GOAL); }
+    c.stroke(); c.restore();
+    const bx = post === 0 ? x0 + 2 : x0 + 34;
+    c.strokeStyle = col; c.lineWidth = 5; c.beginPath(); c.moveTo(bx, GT); c.lineTo(bx, GT + GOAL); c.stroke();
+    for (const py of [GT, GT + GOAL]) { c.fillStyle = col; c.beginPath(); c.arc(post, py, 8, 0, Math.PI * 2); c.fill(); c.strokeStyle = '#fff'; c.lineWidth = 2.5; c.stroke(); }
+  }
+}
+
+function bar(x, y, a, col) { // la barre du joueur
+  c.save(); c.translate(x, y); c.rotate(a);
+  c.shadowColor = 'rgba(30,38,48,.35)'; c.shadowBlur = 9; c.shadowOffsetY = 5;
+  c.fillStyle = col; rr(-HW, -HH, HW * 2, HH * 2, 7); c.fill();
+  c.shadowColor = 'transparent'; c.shadowBlur = 0; c.shadowOffsetY = 0;
+  c.strokeStyle = C.ink; c.lineWidth = 2.5; c.stroke();
+  c.fillStyle = 'rgba(255,255,255,.4)'; rr(-HW + 7, -HH + 3, HW * 2 - 14, 3, 1.5); c.fill();
+  c.restore();
+}
+
+function puck(x, y, an) { // le palet : un disque noir avec un repère qui tourne (on voit l'effet)
+  c.save();
+  c.shadowColor = 'rgba(30,38,48,.4)'; c.shadowBlur = 8; c.shadowOffsetY = 4;
+  const g = c.createRadialGradient(x - 4, y - 5, 1, x, y, PR);
+  g.addColorStop(0, '#59636F'); g.addColorStop(1, '#151B22');
+  c.fillStyle = g; c.beginPath(); c.arc(x, y, PR, 0, Math.PI * 2); c.fill();
+  c.restore();
+  c.save(); c.translate(x, y); c.rotate(an || 0);
+  c.strokeStyle = 'rgba(255,255,255,.8)'; c.lineWidth = 2.5; c.lineCap = 'round';
+  c.beginPath(); c.moveTo(-PR + 4, 0); c.lineTo(PR - 4, 0); c.stroke();
+  c.restore();
+}
+
 const trails = {};
 function drawTrail(key, x, y) {
   const now = performance.now(), t = trails[key] || (trails[key] = []), l = t[t.length - 1];
   if (l && Math.hypot(l[0] - x, l[1] - y) > 120) t.length = 0;
   if (!l || Math.hypot(l[0] - x, l[1] - y) > 2) t.push([x, y, now]);
   while (t.length && now - t[0][2] > 220) t.shift();
-  c.save(); c.shadowBlur = 0; c.fillStyle = '#9fd3ff';
-  for (const q of t) { const k = 1 - (now - q[2]) / 220; c.globalAlpha = 0.25 * k; c.beginPath(); c.arc(q[0], q[1], PR * (0.5 + 0.5 * k), 0, Math.PI * 2); c.fill(); }
-  c.restore();
-}
-function ballMark(x, y, an) {
-  c.save(); c.shadowBlur = 0; c.translate(x, y); c.rotate(an || 0);
-  c.strokeStyle = '#12293d'; c.lineWidth = 3; c.beginPath(); c.moveTo(-PR + 3, 0); c.lineTo(PR - 3, 0); c.stroke();
+  c.save(); c.fillStyle = C.ink;
+  for (const q of t) { const k = 1 - (now - q[2]) / 220; c.globalAlpha = 0.13 * k; c.beginPath(); c.arc(q[0], q[1], PR * (0.5 + 0.5 * k), 0, Math.PI * 2); c.fill(); }
   c.restore();
 }
 
-function drawObj(o, alpha) {
+function drawObj(o, alpha) { // murs, bumpers et cibles de la map
   c.save(); c.globalAlpha = alpha; c.translate(o.x, o.y);
-  if (o.t === 'w') { c.rotate(o.a); c.fillStyle = '#8fa6ba'; c.fillRect(-o.s / 2, -8, o.s, 16); }
-  else if (o.t === 'm') { c.fillStyle = '#ff9f43'; c.beginPath(); c.arc(0, 0, o.s, 0, Math.PI * 2); c.fill(); c.strokeStyle = '#fff'; c.lineWidth = 3; c.stroke(); }
-  else { c.fillStyle = '#6be37a44'; c.strokeStyle = '#6be37a'; c.lineWidth = 5; c.beginPath(); c.arc(0, 0, o.s, 0, Math.PI * 2); c.fill(); c.stroke(); }
+  c.shadowColor = 'rgba(30,38,48,.3)'; c.shadowBlur = 6; c.shadowOffsetY = 3;
+  if (o.t === 'w') {
+    c.rotate(o.a); c.fillStyle = '#34414F'; rr(-o.s / 2, -8, o.s, 16, 5); c.fill();
+    c.shadowColor = 'transparent'; c.fillStyle = 'rgba(255,255,255,.18)'; rr(-o.s / 2 + 5, -5, o.s - 10, 3, 1.5); c.fill();
+  } else if (o.t === 'm') {
+    c.fillStyle = C.amber; c.beginPath(); c.arc(0, 0, o.s, 0, Math.PI * 2); c.fill();
+    c.shadowColor = 'transparent'; c.strokeStyle = C.ink; c.lineWidth = 3; c.stroke();
+    c.strokeStyle = '#fff'; c.lineWidth = 4; c.beginPath(); c.arc(0, 0, o.s * 0.62, 0, Math.PI * 2); c.stroke();
+    c.fillStyle = C.ink; c.beginPath(); c.arc(0, 0, o.s * 0.2, 0, Math.PI * 2); c.fill();
+  } else {
+    c.shadowColor = 'transparent';
+    for (const [k, col] of [[1, C.green], [0.66, '#fff'], [0.33, C.green]]) { c.fillStyle = col; c.beginPath(); c.arc(0, 0, o.s * k, 0, Math.PI * 2); c.fill(); }
+    c.strokeStyle = C.ink; c.lineWidth = 3; c.beginPath(); c.arc(0, 0, o.s, 0, Math.PI * 2); c.stroke();
+  }
   c.restore();
 }
 
 function drawC(S) {
   c.clearRect(0, 0, cv.width, cv.height);
-  c.fillStyle = '#0b141d'; c.fillRect(0, 0, cv.width, cv.height);
+  c.fillStyle = C.page; c.fillRect(0, 0, cv.width, cv.height);
   c.save(); c.translate(M, M);
-  c.fillStyle = '#12293d'; c.fillRect(0, 0, W, H);
-  c.strokeStyle = '#ffffff70'; c.lineWidth = 6; c.strokeRect(0, 0, W, H);
+  rink(false);
   for (const o of MAP.o) drawObj(o, 1);
-  if (edit) for (const b of MAP.b) { c.strokeStyle = '#ffffff55'; c.lineWidth = 2; c.setLineDash([4, 4]); c.beginPath(); c.arc(b[1], b[2], PR + 4, 0, Math.PI * 2); c.stroke(); c.setLineDash([]); }
+  if (edit) for (const b of MAP.b) { c.strokeStyle = 'rgba(30,38,48,.45)'; c.lineWidth = 2; c.setLineDash([4, 4]); c.beginPath(); c.arc(b[1], b[2], PR + 4, 0, Math.PI * 2); c.stroke(); c.setLineDash([]); }
   if (S) {
     S.pl.forEach(q => {
       const mine = q[4] === myId && me;
       const x = mine ? me.x : q[0], y = mine ? me.y : q[1], a = mine ? me.a : q[2];
-      c.save(); c.translate(x, y); c.rotate(a);
-      c.fillStyle = COLORS[q[5] % 8]; c.fillRect(-HW, -HH, HW * 2, HH * 2);
-      c.strokeStyle = '#fff'; c.lineWidth = 2; c.strokeRect(-HW, -HH, HW * 2, HH * 2);
-      c.restore();
-      text(q[3], x, y - 80, 15, '#ffffffaa');
+      bar(x, y, a, COLORS[q[5] % 8]);
+      text(q[3], x, y - 80, 15, 'rgba(30,38,48,.75)');
     });
-    c.fillStyle = '#fff'; c.shadowColor = '#fff'; c.shadowBlur = 14;
-    for (const b of S.b) { drawTrail(b[0], b[1], b[2]); c.beginPath(); c.arc(b[1], b[2], PR, 0, Math.PI * 2); c.fill(); ballMark(b[1], b[2], b[3]); }
-    c.shadowBlur = 0;
-    text('Cibles touchées : ' + S.sc, W / 2, -12, 22, '#e8f1f8');
+    for (const b of S.b) { drawTrail(b[0], b[1], b[2]); puck(b[1], b[2], b[3]); }
   }
   if (edit) {
-    if (tool === 'b') { c.fillStyle = '#ffffff88'; c.beginPath(); c.arc(mouse.x, mouse.y, PR, 0, Math.PI * 2); c.fill(); }
-    else if (tool === 'x') { c.strokeStyle = '#ff4d4d'; c.lineWidth = 3; c.beginPath(); c.arc(mouse.x, mouse.y, 18, 0, Math.PI * 2); c.stroke(); }
-    else drawObj({ t: tool, x: mouse.x, y: mouse.y, a: myAngle(), s: size[tool] }, 0.5);
-    text('ÉDITION : clic = poser · molette = taille · Z/E = tourner le mur', W / 2, H + 30, 16, '#ffd84a');
+    if (tool === 'b') { c.strokeStyle = C.ink; c.lineWidth = 2.5; c.setLineDash([5, 4]); c.beginPath(); c.arc(mouse.x, mouse.y, PR, 0, Math.PI * 2); c.stroke(); c.setLineDash([]); }
+    else if (tool === 'x') { c.strokeStyle = C.red; c.lineWidth = 3.5; c.beginPath(); c.arc(mouse.x, mouse.y, 18, 0, Math.PI * 2); c.moveTo(mouse.x - 12, mouse.y - 12); c.lineTo(mouse.x + 12, mouse.y + 12); c.stroke(); }
+    else drawObj({ t: tool, x: mouse.x, y: mouse.y, a: myAngle(), s: size[tool] }, 0.55);
+    text('Édition : clic pour poser, molette pour la taille, Z et E pour tourner le mur', W / 2, H - 18, 17, C.ink);
   }
   c.restore();
 }
@@ -253,7 +430,7 @@ cv.addEventListener('wheel', e => {
   const [lo, hi, st] = RNG[tool];
   size[tool] = Math.max(lo, Math.min(hi, size[tool] - Math.sign(e.deltaY) * st));
 }, { passive: false });
-const baseInfo = () => (fun ? '⚡ FUN · ' : '') + (mode === 'c' ? 'Mode créatif : construis la map avec tes potes' : side < 0 ? 'Spectateur' : side === 0 ? 'Tu joues à gauche (bleu)' : 'Tu joues à droite (rouge)');
+const baseInfo = () => (mode === 'c' ? 'Map libre : construis-la avec tes potes' : side < 0 ? 'Tu regardes la partie' : side === 0 ? 'Tu joues à gauche (bleu)' : 'Tu joues à droite (rouge)') + (fun ? ', vitesse de balle réglable' : '');
 function setSpd(v) { $('spd').value = v; $('spdVal').textContent = 'x' + Number(v).toFixed(1); }
 function toMenu() {
   local = null; joinInfo = null; side = -1; me = null; buf.length = 0; mode = 'm'; edit = false; fun = false;
@@ -277,7 +454,7 @@ $('go').onclick = () => {
   sock.on('joined', d => {
     side = d.side; roomCode = d.room; mode = d.mode || 'm'; myId = d.id; buf.length = 0; edit = false;
     fun = !!d.fun; setSpd(d.spd || 1); $('spdBox').style.display = fun ? 'flex' : 'none'; $('copy').style.display = '';
-    $('toolBtns').style.display = 'none'; $('editBtn').textContent = '✏️ Éditer la map';
+    $('toolBtns').style.display = 'none'; $('editBtn').textContent = 'Éditer la map';
     $('tools').style.display = mode === 'c' ? 'flex' : 'none';
     me = side < 0 ? null : { x: side === 0 ? 150 : W - 150, y: H / 2, a: HALF, last: 0 };
     $('menu').style.display = 'none';
@@ -304,7 +481,7 @@ $('no').onclick = () => { sock.emit('answer', false); $('ask').style.display = '
 $('spd').oninput = () => { $('spdVal').textContent = 'x' + (+$('spd').value).toFixed(1); if (local) local.spd = +$('spd').value; else if (sock) sock.emit('spd', +$('spd').value); };
 
 // ----- outils du mode créatif -----
-$('editBtn').onclick = () => { edit = !edit; $('toolBtns').style.display = edit ? 'flex' : 'none'; $('editBtn').textContent = edit ? '▶ Jouer' : '✏️ Éditer la map'; };
+$('editBtn').onclick = () => { edit = !edit; $('toolBtns').style.display = edit ? 'flex' : 'none'; $('editBtn').textContent = edit ? 'Jouer' : 'Éditer la map'; };
 document.querySelectorAll('[data-tool]').forEach(b => b.onclick = () => { tool = b.dataset.tool; document.querySelectorAll('[data-tool]').forEach(x => x.classList.toggle('on', x === b)); });
 $('resetBtn').onclick = () => send('reset');
 $('clearBtn').onclick = () => { if (confirm('Tout vider (murs, bumpers, cibles, balles) ?')) send('clear'); };
@@ -323,68 +500,93 @@ $('copy').onclick = () => {
   navigator.clipboard.writeText(url).then(() => { $('copy').textContent = 'Copié !'; setTimeout(() => $('copy').textContent = 'Copier le lien', 1500); });
 };
 
+// Souris captée (Pointer Lock) : le curseur est caché et ne sort plus de la zone. Échap la libère.
+const LEASH = 24; // si la barre est bloquée (mur, milieu), la souris ne peut pas s'éloigner de plus de 24 px d'elle : demi-tour presque immédiat
+const locked = () => document.pointerLockElement === cv;
 function setMouse(e) {
+  if (locked()) return;
   const r = cv.getBoundingClientRect(), k = cv.width / r.width;
   mouse.x = (e.clientX - r.left) * k - M;
   mouse.y = (e.clientY - r.top) * k - M;
   mouse.t = performance.now();
 }
+function myPaddle() { return me || (local && (local.pl ? local.pl.me : local.players && local.players[0])) || null; }
+function leash() {
+  const p = myPaddle();
+  if (!p || !locked() || edit) return;
+  const dx = mouse.x - p.x, dy = mouse.y - p.y, d = Math.hypot(dx, dy);
+  if (d > LEASH) { mouse.x = p.x + dx * LEASH / d; mouse.y = p.y + dy * LEASH / d; }
+}
+document.addEventListener('mousemove', e => {
+  if (!locked()) return;
+  const k = cv.width / cv.getBoundingClientRect().width;
+  mouse.x = Math.max(0, Math.min(W, mouse.x + e.movementX * k));
+  mouse.y = Math.max(0, Math.min(H, mouse.y + e.movementY * k));
+  mouse.t = performance.now();
+});
+document.addEventListener('pointerlockchange', () => {
+  const p = myPaddle();
+  if (locked() && p) { mouse.x = p.x; mouse.y = p.y; } // la souris repart de la barre : pas de saut
+});
 cv.addEventListener('pointermove', setMouse);
-cv.addEventListener('pointerdown', e => { setMouse(e); if (mode === 'c' && edit) place(); });
+cv.addEventListener('pointerdown', e => {
+  if (!locked() && cv.requestPointerLock) { cv.requestPointerLock(); return; }
+  setMouse(e);
+  if (mode === 'c' && edit) place();
+});
 addEventListener('keydown', e => { const k = e.key.toLowerCase(); if (k in keys) keys[k] = true; });
 addEventListener('keyup', e => { const k = e.key.toLowerCase(); if (k in keys) keys[k] = false; });
 addEventListener('blur', () => { keys.z = keys.e = keys.t = false; });
 
 function text(t, x, y, size, color, align = 'center') {
-  c.font = `bold ${size}px system-ui, sans-serif`; c.fillStyle = color; c.textAlign = align; c.fillText(t, x, y);
+  c.font = '600 ' + size + 'px Barlow, system-ui, sans-serif'; c.fillStyle = color; c.textAlign = align; c.fillText(t, x, y);
+}
+function banner(t, y, size) { // gros message sur la glace (but, victoire, attente)
+  c.save(); c.font = '800 ' + size + 'px ' + DISPLAY; c.textAlign = 'center'; c.lineJoin = 'round';
+  c.lineWidth = 12; c.strokeStyle = C.ink; c.strokeText(t, W / 2, y);
+  c.fillStyle = '#fff'; c.fillText(t, W / 2, y); c.restore();
+}
+function setText(id, t) { const el = $(id); t = String(t); if (el.textContent !== t) el.textContent = t; }
+function hud(S) { // le tableau des scores est du vrai texte de la page, pas dessiné dans le canvas
+  const cr = mode === 'c';
+  const show = (id, on, d) => { const v = on ? d : 'none'; if ($(id).style.display !== v) $(id).style.display = v; };
+  show('score', !cr, 'flex'); show('scoreC', cr, 'flex');
+  document.body.classList.toggle('playing', $('game').style.display === 'block');
+  if (!S) return;
+  if (cr) { setText('sC', S.sc); return; }
+  setText('nL', S.pl[0] ? S.pl[0][3] : 'En attente'); setText('nR', S.pl[1] ? S.pl[1][3] : 'En attente');
+  setText('sL', S.sc[0]); setText('sR', S.sc[1]);
 }
 
 function draw() {
   requestAnimationFrame(draw);
   const now = performance.now(), dt = Math.min(0.05, (now - last) / 1000); last = now;
+  const lh = !locked() && cv.requestPointerLock && $('game').style.display === 'block' ? 'block' : 'none';
+  if ($('lockHint').style.display !== lh) $('lockHint').style.display = lh;
   if (local) tickLocal(dt); else updateMe(dt);
   const S = local ? local.S : mode === 'c' ? viewC() : view();
   const lbl = (mode === 'c' || side < 0 || !S || !S.pl[0] || !S.pl[1] || S.bt) ? 'Retour au lobby' : "Demander l'annulation";
   if ($('leave').textContent !== lbl) $('leave').textContent = lbl;
+  hud(S);
   if (mode === 'c') { drawC(S); return; }
   c.clearRect(0, 0, cv.width, cv.height);
-  c.fillStyle = '#0b141d'; c.fillRect(0, 0, cv.width, cv.height);
+  c.fillStyle = C.page; c.fillRect(0, 0, cv.width, cv.height);
   c.save(); c.translate(M, M);
-
-  // glace
-  c.fillStyle = '#12293d'; c.fillRect(0, 0, W, H);
-  c.strokeStyle = '#ffffff30'; c.lineWidth = 3;
-  c.beginPath(); c.moveTo(W / 2, 0); c.lineTo(W / 2, H); c.stroke();
-  c.beginPath(); c.arc(W / 2, H / 2, 70, 0, Math.PI * 2); c.stroke();
-  c.strokeStyle = '#ffffff70'; c.lineWidth = 6; c.strokeRect(0, 0, W, H);
-  // buts
-  c.fillStyle = '#2f7de1'; c.fillRect(-30, GT, 34, GOAL);
-  c.fillStyle = '#e0473f'; c.fillRect(W - 4, GT, 34, GOAL);
-
+  rink(true);
   if (S) {
-    // joueurs
     S.pl.forEach((p0, i) => {
       const p = (i === side && me && p0) ? [me.x, me.y, me.a, p0[3]] : p0;
       if (!p) return;
-      c.save(); c.translate(p[0], p[1]); c.rotate(p[2]);
-      c.fillStyle = i === 0 ? '#4aa3ff' : '#ff6a5f';
-      c.fillRect(-HW, -HH, HW * 2, HH * 2);
-      c.strokeStyle = '#fff'; c.lineWidth = 2; c.strokeRect(-HW, -HH, HW * 2, HH * 2);
-      c.restore();
-      text(p[3], p[0], p[1] - 80, 15, '#ffffffaa');
+      bar(p[0], p[1], p[2], i === 0 ? C.blue : C.red);
+      text(p[3], p[0], p[1] - 80, 15, 'rgba(30,38,48,.75)');
     });
-    // balle
-    c.fillStyle = '#fff'; c.shadowColor = '#fff'; c.shadowBlur = 14;
     drawTrail('p', S.p[0], S.p[1]);
-    c.beginPath(); c.arc(S.p[0], S.p[1], PR, 0, Math.PI * 2); c.fill();
-    ballMark(S.p[0], S.p[1], S.p[2]);
-    c.shadowBlur = 0;
-    // score
-    const n0 = S.pl[0] ? S.pl[0][3] : '…', n1 = S.pl[1] ? S.pl[1][3] : '…';
-    text(`${n0}  ${S.sc[0]}  -  ${S.sc[1]}  ${n1}`, W / 2, -12, 24, '#e8f1f8');
-    // messages
-    if (S.m) text(S.m, W / 2, H / 2 - 100, 44, '#ffd84a');
-    else if (!S.pl[0] || !S.pl[1]) text('En attente d\'un pote… envoie-lui le lien !', W / 2, H / 2 - 100, 28, '#9db4c8');
+    puck(S.p[0], S.p[1], S.p[2]);
+    if (S.m) banner(S.m, H / 2 - 90, 62);
+    else if (!S.pl[0] || !S.pl[1]) {
+      banner("En attente d'un adversaire", H / 2 - 100, 46);
+      text('Envoie-lui le lien du salon avec « Copier le lien »', W / 2, H / 2 - 62, 21, C.ink, 'center');
+    }
   }
   c.restore();
 }
