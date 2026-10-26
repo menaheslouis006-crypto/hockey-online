@@ -79,6 +79,8 @@ io.on('connection', sock => {
     sock.emit('joined', { side, room: code, mode: 'm', id: sock.id, fun: r.fun, spd: r.spd });
   });
 
+  sock.on('ping', (t, cb) => { if (typeof cb === 'function') cb(t); }); // mesure de latence côté navigateur
+
   sock.on('in', d => {
     const me = sock.data.me;
     if (!me || !d) return;

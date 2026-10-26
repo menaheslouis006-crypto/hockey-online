@@ -71,6 +71,20 @@ function goal(r, side) {
   else { r.freeze = 1.5; r.msg = `BUT ! ${who}`; }
 }
 
+// Un sous-pas de la balle seule (déplacement, effet, chocs avec les barres, murs). Pas de buts ici.
+function puckSub(p, pls, s, k) {
+  p.x += p.vx * s * k; p.y += p.vy * s * k;
+  p.vx *= 1 - 0.35 * s * k; p.vy *= 1 - 0.35 * s * k;
+  spin(p, s, k);
+  for (const pl of pls) if (pl) hit(p, pl);
+  if (p.y < PR) { p.y = PR; p.vy = Math.abs(p.vy) * 0.95; }
+  if (p.y > H - PR) { p.y = H - PR; p.vy = -Math.abs(p.vy) * 0.95; }
+  if (!(p.y > GT && p.y < GB)) {
+    if (p.x < PR) { p.x = PR; p.vx = Math.abs(p.vx) * 0.95; }
+    if (p.x > W - PR) { p.x = W - PR; p.vx = -Math.abs(p.vx) * 0.95; }
+  }
+}
+
 function step(r, dt) {
   if (r.freeze > 0) {
     r.freeze -= dt;
@@ -82,18 +96,7 @@ function step(r, dt) {
     for (const pl of r.players) if (pl) HK.stepPaddle(pl, pl.tx, pl.ty, pl.r, pl.t, pl.side === 0 ? WL0 : WL1, s, SPIN);
     if (!active) continue;
     const p = r.puck;
-    p.x += p.vx * s * r.spd * BASE; p.y += p.vy * s * r.spd * BASE;
-    p.vx *= 1 - 0.35 * s * r.spd * BASE; p.vy *= 1 - 0.35 * s * r.spd * BASE;
-    spin(p, s, r.spd * BASE);
-    for (const pl of r.players) if (pl) hit(p, pl);
-    // murs
-    if (p.y < PR) { p.y = PR; p.vy = Math.abs(p.vy) * 0.95; }
-    if (p.y > H - PR) { p.y = H - PR; p.vy = -Math.abs(p.vy) * 0.95; }
-    const inGoal = p.y > GT && p.y < GB;
-    if (!inGoal) {
-      if (p.x < PR) { p.x = PR; p.vx = Math.abs(p.vx) * 0.95; }
-      if (p.x > W - PR) { p.x = W - PR; p.vx = -Math.abs(p.vx) * 0.95; }
-    }
+    puckSub(p, r.players, s, r.spd * BASE);
     if (p.x < -PR) { goal(r, 1); break; }
     if (p.x > W + PR) { goal(r, 0); break; }
   }
@@ -127,43 +130,49 @@ function bump(b, o) {
   if (vn < 0) { b.vx -= 2 * vn * nx; b.vy -= 2 * vn * ny; vn = -vn; }
   if (vn < 500) { b.vx += nx * (500 - vn); b.vy += ny * (500 - vn); }
 }
+// Un sous-pas de toutes les balles (barres fournies, murs, bumpers, cibles, chocs entre balles)
+function ballsSub(r, P, s, k) {
+  const B = r.balls;
+  for (const b of B) {
+    b.x += b.vx * s * k; b.y += b.vy * s * k;
+    b.vx *= 1 - 0.25 * s * k; b.vy *= 1 - 0.25 * s * k;
+    spin(b, s, k);
+    for (const pl of P) hit(b, pl);
+    for (const o of r.objs) {
+      if (o.t === 'w') box(b, o.x, o.y, o.a, o.s / 2, 8, 0, 0, 0, 0.9, 0.15);
+      else if (o.t === 'm') bump(b, o);
+      else if (Math.hypot(b.x - o.x, b.y - o.y) < o.s) { r.score++; b.x = b.sx; b.y = b.sy; b.vx = b.vy = 0; b.om = 0; }
+    }
+    if (b.x < PR) { b.x = PR; b.vx = Math.abs(b.vx) * 0.95; }
+    if (b.x > W - PR) { b.x = W - PR; b.vx = -Math.abs(b.vx) * 0.95; }
+    if (b.y < PR) { b.y = PR; b.vy = Math.abs(b.vy) * 0.95; }
+    if (b.y > H - PR) { b.y = H - PR; b.vy = -Math.abs(b.vy) * 0.95; }
+    const sp = Math.hypot(b.vx, b.vy);
+    if (sp > MAXV) { b.vx *= MAXV / sp; b.vy *= MAXV / sp; }
+  }
+  for (let j = 0; j < B.length; j++) for (let k = j + 1; k < B.length; k++) {
+    const p = B[j], q = B[k];
+    const dx = q.x - p.x, dy = q.y - p.y, d = Math.hypot(dx, dy);
+    if (d < 2 * PR && d > 0) {
+      const nx = dx / d, ny = dy / d, ov = (2 * PR - d) / 2;
+      p.x -= nx * ov; p.y -= ny * ov; q.x += nx * ov; q.y += ny * ov;
+      const vn = (q.vx - p.vx) * nx + (q.vy - p.vy) * ny;
+      if (vn < 0) { p.vx += vn * nx; p.vy += vn * ny; q.vx -= vn * nx; q.vy -= vn * ny; }
+    }
+  }
+}
+
 function cstep(r, dt) {
   const n = subs(dt, r.spd * BASE), s = dt / n, P = Object.values(r.pl), B = r.balls;
   const wl = HK.BORDERS.concat(r.objs.filter(o => o.t === 'w').map(o => ({ x: o.x, y: o.y, a: o.a, hw: o.s / 2, hh: 8, f: true })));
   for (let i = 0; i < n; i++) {
     for (const pl of P) HK.stepPaddle(pl, pl.tx, pl.ty, pl.r, pl.t, wl, s, SPIN);
-    for (const b of B) {
-      b.x += b.vx * s * r.spd * BASE; b.y += b.vy * s * r.spd * BASE;
-      b.vx *= 1 - 0.25 * s * r.spd * BASE; b.vy *= 1 - 0.25 * s * r.spd * BASE;
-      spin(b, s, r.spd * BASE);
-      for (const pl of P) hit(b, pl);
-      for (const o of r.objs) {
-        if (o.t === 'w') box(b, o.x, o.y, o.a, o.s / 2, 8, 0, 0, 0, 0.9, 0.15);
-        else if (o.t === 'm') bump(b, o);
-        else if (Math.hypot(b.x - o.x, b.y - o.y) < o.s) { r.score++; b.x = b.sx; b.y = b.sy; b.vx = b.vy = 0; b.om = 0; }
-      }
-      if (b.x < PR) { b.x = PR; b.vx = Math.abs(b.vx) * 0.95; }
-      if (b.x > W - PR) { b.x = W - PR; b.vx = -Math.abs(b.vx) * 0.95; }
-      if (b.y < PR) { b.y = PR; b.vy = Math.abs(b.vy) * 0.95; }
-      if (b.y > H - PR) { b.y = H - PR; b.vy = -Math.abs(b.vy) * 0.95; }
-      const sp = Math.hypot(b.vx, b.vy);
-      if (sp > MAXV) { b.vx *= MAXV / sp; b.vy *= MAXV / sp; }
-    }
-    for (let j = 0; j < B.length; j++) for (let k = j + 1; k < B.length; k++) {
-      const p = B[j], q = B[k];
-      const dx = q.x - p.x, dy = q.y - p.y, d = Math.hypot(dx, dy);
-      if (d < 2 * PR && d > 0) {
-        const nx = dx / d, ny = dy / d, ov = (2 * PR - d) / 2;
-        p.x -= nx * ov; p.y -= ny * ov; q.x += nx * ov; q.y += ny * ov;
-        const vn = (q.vx - p.vx) * nx + (q.vy - p.vy) * ny;
-        if (vn < 0) { p.vx += vn * nx; p.vy += vn * ny; q.vx -= vn * nx; q.vy -= vn * ny; }
-      }
-    }
+    ballsSub(r, P, s, r.spd * BASE);
   }
 }
 const csnap = r => ({
   pl: Object.values(r.pl).map(q => [f(q.x), f(q.y), Math.round(q.a * 100) / 100, q.name, q.id, q.ci]),
-  b: r.balls.map(b => [b.id, f(b.x), f(b.y), Math.round((b.an || 0) * 100) / 100]),
+  b: r.balls.map(b => [b.id, f(b.x), f(b.y), Math.round((b.an || 0) * 100) / 100, Math.round(b.vx), Math.round(b.vy), f(b.om || 0)]),
   sc: r.score,
 });
 
@@ -208,7 +217,7 @@ function botThink(r, dt) {
 
 function snap(r) {
   return {
-    p: [f(r.puck.x), f(r.puck.y), Math.round((r.puck.an || 0) * 100) / 100],
+    p: [f(r.puck.x), f(r.puck.y), Math.round((r.puck.an || 0) * 100) / 100, Math.round(r.puck.vx), Math.round(r.puck.vy), f(r.puck.om || 0)],
     pl: r.players.map(q => q && [f(q.x), f(q.y), Math.round(q.a * 100) / 100, q.name]),
     sc: r.score, fr: r.freeze > 0, w: r.winner, m: r.msg, sp: r.spect.length, bt: r.botRoom ? 1 : 0,
   };
@@ -242,6 +251,6 @@ function edit(r, ev, d) {
   return false;
 }
 
-  const api = { W, H, clamp, reset, newRoom, newPlayer, step, snap, newCRoom, cstep, csnap, mapOf, mkObj, mkBall, edit, BOTS, newBot, botThink };
+  const api = { W, H, PR, HW, BASE, subs, puckSub, ballsSub, clamp, reset, newRoom, newPlayer, step, snap, newCRoom, cstep, csnap, mapOf, mkObj, mkBall, edit, BOTS, newBot, botThink };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.EN = api;
 })(typeof window !== 'undefined' ? window : this);

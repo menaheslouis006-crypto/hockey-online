@@ -39,17 +39,24 @@
   .seg button[aria-pressed=true], .seg button.on { background: var(--ink); color: #fff; }
   .seg button:not([aria-pressed=true]):not(.on):hover { background: #E4EDF2; }
   #hint { min-height: 2.7em; margin: 2px 0 16px; color: var(--muted); font-size: 16px; }
-  .btn { align-self: flex-start; padding: 12px 30px 11px; border: 2px solid var(--ink); border-radius: 6px; background: var(--red); color: #fff; font: 800 28px/1 'Barlow Condensed', sans-serif; cursor: pointer; box-shadow: 0 4px 0 var(--ink); transition: transform .06s, box-shadow .06s; }
-  .btn:hover { transform: translateY(-1px); box-shadow: 0 5px 0 var(--ink); }
+  .btn { position: relative; overflow: hidden; align-self: flex-start; padding: 12px 30px 11px; border: 2px solid var(--ink); border-radius: 6px; background: var(--red); color: #fff; font: 800 28px/1 'Barlow Condensed', sans-serif; cursor: pointer; box-shadow: 0 4px 0 var(--ink); transition: transform .06s, box-shadow .06s; }
+  .btn::after { content: ''; position: absolute; top: 0; bottom: 0; left: -60%; width: 40%; background: linear-gradient(100deg, transparent, rgba(255, 255, 255, .45), transparent); transform: skewX(-18deg); pointer-events: none; }
+  .btn:hover::after { animation: shine .6s ease-out; }
+  .btn:hover { transform: translateY(-2px); box-shadow: 0 6px 0 var(--ink); }
   .btn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink); }
-  .btn2 { padding: 7px 14px; border: 2px solid var(--ink); border-radius: 6px; background: transparent; color: var(--ink); font: 600 15px 'Barlow', sans-serif; cursor: pointer; }
-  .btn2:hover { background: #fff; }
+  .btn2 { transition: transform .12s, background .12s, box-shadow .12s; padding: 7px 14px; border: 2px solid var(--ink); border-radius: 6px; background: transparent; color: var(--ink); font: 600 15px 'Barlow', sans-serif; cursor: pointer; }
+  .btn2:hover { background: #fff; transform: translateY(-1px); box-shadow: 0 3px 0 var(--ink); }
+  .btn2:active { transform: translateY(1px) scale(.97); box-shadow: none; }
+  .btn2.ok { background: #1E9B57; border-color: #1E9B57; color: #fff; animation: pop .38s ease-out; }
+  .seg button:active { transform: scale(.95); }
+  .seg button.sel { animation: selpop .3s ease-out; }
 
   /* partie */
   #game { position: relative; display: none; width: 100%; max-width: 1700px; padding: 8px 12px 18px; animation: rise .35s ease-out; }
   #bar { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 12px; min-height: 56px; }
   #info { color: var(--muted); font-size: 15px; line-height: 1.25; }
-  #bar .actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+  #bar .actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; align-items: center; }
+  #ping { color: var(--muted); font-size: 14px; font-variant-numeric: tabular-nums; }
   #score { display: flex; align-items: center; justify-content: center; gap: clamp(10px, 2vw, 22px); font-family: 'Barlow Condensed', sans-serif; }
   #score .side { display: flex; align-items: center; gap: 12px; min-width: 0; }
   #score .l { justify-content: flex-end; color: var(--blue); }
@@ -72,7 +79,7 @@
   #toolBtns .seg button { flex: none; padding: 7px 14px; font-size: 15px; }
   canvas { display: block; width: 100%; height: auto; aspect-ratio: 1080 / 640; margin: 0 auto; cursor: none; touch-action: none; } /* la largeur exacte est calculée en JS pour remplir la fenêtre */
   #keys { margin: 6px 2px 0; color: var(--muted); font-size: 14px; }
-  kbd { padding: 1px 6px; border: 1.5px solid var(--ink); border-radius: 4px; background: #fff; color: var(--ink); font: 600 13px 'Barlow', sans-serif; box-shadow: 0 2px 0 var(--ink); }
+  kbd { transition: transform .08s, box-shadow .08s, background .08s, color .08s; display: inline-block; padding: 1px 6px; border: 1.5px solid var(--ink); border-radius: 4px; background: #fff; color: var(--ink); font: 600 13px 'Barlow', sans-serif; box-shadow: 0 2px 0 var(--ink); }
   #lockHint { position: absolute; left: 50%; top: 56%; transform: translate(-50%, -50%); display: none; z-index: 5; padding: 14px 20px; border-radius: 6px; background: var(--ink); color: #fff; font-weight: 600; font-size: 18px; line-height: 1.35; text-align: center; pointer-events: none; }
   #lockHint small { display: block; margin-top: 2px; font-weight: 400; font-size: 15px; opacity: .8; }
 
@@ -83,6 +90,11 @@
   #ask .row { display: flex; gap: 10px; align-items: center; }
   #ask .btn { padding: 9px 20px 8px; font-size: 22px; }
 
+  kbd.down { transform: translateY(2px); box-shadow: 0 0 0 var(--ink); background: var(--blue); color: #fff; }
+  @keyframes shine { from { left: -60%; } to { left: 130%; } }
+  @keyframes selpop { 0% { transform: scale(.9); } 55% { transform: scale(1.06); } 100% { transform: scale(1); } }
+  @keyframes up { from { opacity: 0; transform: translateY(14px); } }
+  #menu > * { animation: up .5s cubic-bezier(.2, .7, .2, 1) backwards; animation-delay: calc(var(--i, 0) * 55ms + 80ms); }
   @keyframes rise { from { opacity: 0; transform: translateY(10px); } }
   @keyframes pop { 0% { transform: scale(1); } 40% { transform: scale(1.3); } 100% { transform: scale(1); } }
   @keyframes popin { from { opacity: 0; transform: scale(.93); } }
@@ -132,7 +144,7 @@
       </div>
       <div id="scoreC"><span>Cibles touchées</span><b id="sC">0</b></div>
     </div>
-    <span class="actions"><button class="btn2" id="copy">Copier le lien</button><button class="btn2" id="leave">Retour au lobby</button></span>
+    <span class="actions"><span id="ping"></span><button class="btn2" id="copy">Copier le lien</button><button class="btn2" id="leave">Retour au lobby</button></span>
   </div>
   <div id="spdBox"><label for="spd">Vitesse de la balle</label><input type="range" id="spd" min="0.5" max="3" step="0.1" value="1"><b id="spdVal">x1.0</b><small>x1.0 est la vitesse normale</small></div>
   <div id="tools">
@@ -144,7 +156,7 @@
   </div>
   <canvas id="cv" width="1080" height="640"></canvas>
   <div id="lockHint">Clique sur le terrain pour prendre la souris<small>Échap pour la rendre</small></div>
-  <p id="keys">Bouge avec la souris. <kbd>Z</kbd> et <kbd>E</kbd> font tourner la barre, <kbd>T</kbd> la remet droite, <kbd>Échap</kbd> libère la souris.</p>
+  <p id="keys">Bouge avec la souris. <kbd data-k="z">Z</kbd> et <kbd data-k="e">E</kbd> font tourner la barre, <kbd data-k="t">T</kbd> la remet droite, <kbd data-k="escape">Échap</kbd> libère la souris.</p>
 </div>
 
 <div id="ask"><div class="box"><p id="askText"></p><div class="row"><button class="btn" id="yes">Accepter</button><button class="btn2" id="no">Refuser</button></div></div></div>
@@ -152,6 +164,7 @@
 <script src="/socket.io/socket.io.js"></script>
 <script src="/shared.js"></script>
 <script src="/engine.js"></script>
+<script src="/predict.js"></script>
 <script>
 const W = 1000, H = 600, M = 40, MY = 20, CW = W + 2 * M, CH = H + 2 * MY, GOAL = 180, GT = (H - GOAL) / 2, PR = 14, HW = 65, HH = 8;
 const $ = id => document.getElementById(id);
@@ -170,7 +183,7 @@ function renderSeg(id) {
   for (const o of sel.options) {
     const b = document.createElement('button');
     b.type = 'button'; b.textContent = o.textContent; b.setAttribute('aria-pressed', o.value === sel.value);
-    b.onclick = () => { sel.value = o.value; renderSeg(id); if (sel.onchange) sel.onchange(); };
+    b.onclick = () => { sel.value = o.value; renderSeg(id); const i = [...sel.options].indexOf(o); const nb = $(id + 'Seg').children[i]; if (nb && !reduced) nb.classList.add('sel'); if (sel.onchange) sel.onchange(); };
     box.appendChild(b);
   }
 }
@@ -193,6 +206,7 @@ $('opp').onchange = () => { $('roomField').style.display = $('opp').value ? 'non
 $('variant').onchange = hint;
 $('mode').onchange = fillOpp;
 renderSeg('mode'); renderSeg('variant'); fillOpp();
+[...$('menu').children].forEach((el, i) => el.style.setProperty('--i', i)); // le lobby apparaît en cascade
 
 let sock, S = null, side = -1, roomCode = '';
 const mouse = { x: W / 2, y: H / 2 }, keys = { z: false, e: false, t: false };
@@ -448,7 +462,7 @@ cv.addEventListener('wheel', e => {
 const baseInfo = () => (mode === 'c' ? 'Map libre : construis-la avec tes potes' : side < 0 ? 'Tu regardes la partie' : side === 0 ? 'Tu joues à gauche (bleu)' : 'Tu joues à droite (rouge)') + (fun ? ', vitesse de balle réglable' : '');
 function setSpd(v) { $('spd').value = v; $('spdVal').textContent = 'x' + Number(v).toFixed(1); }
 function toMenu() {
-  local = null; lastSc = null; parts.length = 0; joinInfo = null; side = -1; me = null; buf.length = 0; mode = 'm'; edit = false; fun = false;
+  local = null; PRD.reset(); setText('ping', ''); lastSc = null; parts.length = 0; joinInfo = null; side = -1; me = null; buf.length = 0; mode = 'm'; edit = false; fun = false;
   $('tools').style.display = 'none'; $('spdBox').style.display = 'none';
   $('ask').style.display = 'none';
   $('game').style.display = 'none';
@@ -465,10 +479,12 @@ $('go').onclick = () => {
   joinInfo = { name, room, mode: md, fun: $('variant').value === '1' };
   if (sock) { sock.emit('join', joinInfo); return; }
   sock = io({ transports: ['websocket'] });
+  const ping = () => { const t = performance.now(); sock.emit('ping', t, () => { const ms = performance.now() - t; PRD.setRtt(ms / 1000); setText('ping', 'Ping ' + Math.round(ms) + ' ms'); }); };
+  sock.on('connect', ping); setInterval(ping, 1500);
   sock.on('connect', () => { if (joinInfo) sock.emit('join', joinInfo); });
   sock.on('joined', d => {
     side = d.side; roomCode = d.room; mode = d.mode || 'm'; myId = d.id; buf.length = 0; edit = false;
-    fun = !!d.fun; setSpd(d.spd || 1); $('spdBox').style.display = fun ? 'flex' : 'none'; $('copy').style.display = '';
+    PRD.reset(); fun = !!d.fun; setSpd(d.spd || 1); $('spdBox').style.display = fun ? 'flex' : 'none'; $('copy').style.display = '';
     $('toolBtns').style.display = 'none'; $('editBtn').textContent = 'Éditer la map';
     $('tools').style.display = mode === 'c' ? 'flex' : 'none';
     me = side < 0 ? null : { x: side === 0 ? 150 : W - 150, y: H / 2, a: HALF, last: 0 };
@@ -476,9 +492,9 @@ $('go').onclick = () => {
     $('game').style.display = 'block';
     $('info').textContent = baseInfo();
   });
-  sock.on('s', s => { buf.push({ t: performance.now(), s }); if (buf.length > 30) buf.shift(); });
+  sock.on('s', s => { buf.push({ t: performance.now(), s }); if (buf.length > 30) buf.shift(); PRD.reconcile(s); });
   sock.on('left', toMenu);
-  sock.on('c', s => { buf.push({ t: performance.now(), s }); if (buf.length > 30) buf.shift(); });
+  sock.on('c', s => { buf.push({ t: performance.now(), s }); if (buf.length > 30) buf.shift(); PRD.reconcile(s); });
   sock.on('map', m => { MAP = m; });
   sock.on('spd', v => { if (document.activeElement !== $('spd')) setSpd(v); });
   sock.on('err', m => { alert(m); joinInfo = null; });
@@ -512,7 +528,7 @@ $('impBtn').onclick = () => {
 
 $('copy').onclick = () => {
   const url = location.origin + '/?room=' + roomCode;
-  navigator.clipboard.writeText(url).then(() => { $('copy').textContent = 'Copié !'; setTimeout(() => $('copy').textContent = 'Copier le lien', 1500); });
+  navigator.clipboard.writeText(url).then(() => { $('copy').textContent = 'Copié'; $('copy').classList.add('ok'); setTimeout(() => { $('copy').textContent = 'Copier le lien'; $('copy').classList.remove('ok'); }, 1500); });
 };
 
 // Souris captée (Pointer Lock) : le curseur est caché et ne sort plus de la zone. Échap la libère.
@@ -549,8 +565,8 @@ cv.addEventListener('pointerdown', e => {
   setMouse(e);
   if (mode === 'c' && edit) place();
 });
-addEventListener('keydown', e => { const k = e.key.toLowerCase(); if (k in keys) keys[k] = true; });
-addEventListener('keyup', e => { const k = e.key.toLowerCase(); if (k in keys) keys[k] = false; });
+addEventListener('keydown', e => { const k = e.key.toLowerCase(); if (k in keys) keys[k] = true; const el = document.querySelector('kbd[data-k="' + k + '"]'); if (el) el.classList.add('down'); });
+addEventListener('keyup', e => { const k = e.key.toLowerCase(); if (k in keys) keys[k] = false; const el = document.querySelector('kbd[data-k="' + k + '"]'); if (el) el.classList.remove('down'); });
 addEventListener('blur', () => { keys.z = keys.e = keys.t = false; });
 
 function text(t, x, y, size, color, align = 'center') {
@@ -611,6 +627,9 @@ function drawParts(dt) {
   c.restore();
 }
 
+// Prédiction de la balle en ligne : elle réagit tout de suite à ta barre, le serveur la recale en douceur
+const PRD = PRED.create(EN, { mode: () => mode, me: () => (local ? null : me), myId: () => myId, side: () => side, map: () => MAP, speed: () => parseFloat($('spd').value) || 1 });
+
 // Le terrain prend toute la place disponible dans la fenêtre, et reste net (résolution adaptée à l'écran)
 function fit() {
   const g = $('game');
@@ -650,7 +669,9 @@ function draw() {
   const lh = !locked() && cv.requestPointerLock && $('game').style.display === 'block' ? 'block' : 'none';
   if ($('lockHint').style.display !== lh) $('lockHint').style.display = lh;
   if (local) tickLocal(dt); else updateMe(dt);
-  const S = local ? local.S : mode === 'c' ? viewC() : view();
+  const S0 = local ? local.S : mode === 'c' ? viewC() : view();
+  if (!local) PRD.frame(S0, dt);
+  const S = local ? S0 : PRD.overlay(S0);
   const lbl = (mode === 'c' || side < 0 || !S || !S.pl[0] || !S.pl[1] || S.bt) ? 'Retour au lobby' : "Demander l'annulation";
   if ($('leave').textContent !== lbl) $('leave').textContent = lbl;
   hud(S);
