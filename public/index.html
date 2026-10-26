@@ -34,32 +34,35 @@
   input[type=text] { width: 100%; height: 48px; padding: 0 14px; border: 2px solid var(--ink); border-radius: 6px; background: #fff; color: var(--ink); font: 500 18px 'Barlow', sans-serif; }
   input[type=text]::placeholder { color: #8795A8; }
   .seg { display: flex; border: 2px solid var(--ink); border-radius: 6px; overflow: hidden; background: #fff; }
-  .seg button { flex: 1 1 0; min-width: 0; padding: 11px 8px; border: 0; background: transparent; color: var(--ink); font: 600 16px 'Barlow', sans-serif; white-space: nowrap; cursor: pointer; }
+  .seg button { flex: 1 1 0; min-width: 0; padding: 11px 8px; border: 0; background: transparent; color: var(--ink); font: 600 16px 'Barlow', sans-serif; white-space: nowrap; cursor: pointer; transition: background .12s, color .12s; }
   .seg button + button { border-left: 2px solid var(--ink); }
   .seg button[aria-pressed=true], .seg button.on { background: var(--ink); color: #fff; }
   .seg button:not([aria-pressed=true]):not(.on):hover { background: #E4EDF2; }
   #hint { min-height: 2.7em; margin: 2px 0 16px; color: var(--muted); font-size: 16px; }
   .btn { align-self: flex-start; padding: 12px 30px 11px; border: 2px solid var(--ink); border-radius: 6px; background: var(--red); color: #fff; font: 800 28px/1 'Barlow Condensed', sans-serif; cursor: pointer; box-shadow: 0 4px 0 var(--ink); transition: transform .06s, box-shadow .06s; }
+  .btn:hover { transform: translateY(-1px); box-shadow: 0 5px 0 var(--ink); }
   .btn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink); }
   .btn2 { padding: 7px 14px; border: 2px solid var(--ink); border-radius: 6px; background: transparent; color: var(--ink); font: 600 15px 'Barlow', sans-serif; cursor: pointer; }
   .btn2:hover { background: #fff; }
 
   /* partie */
-  #game { position: relative; display: none; width: 100%; max-width: 1080px; padding: 10px 10px 30px; }
-  #bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; min-height: 40px; }
-  #info { color: var(--muted); font-size: 16px; }
-  #bar .actions { display: flex; gap: 8px; }
-  #score { display: flex; align-items: center; justify-content: center; gap: clamp(10px, 3vw, 26px); margin: 2px 0; font-family: 'Barlow Condensed', sans-serif; }
-  #score .side { flex: 1; display: flex; align-items: center; gap: 14px; min-width: 0; }
+  #game { position: relative; display: none; width: 100%; max-width: 1700px; padding: 8px 12px 18px; animation: rise .35s ease-out; }
+  #bar { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 12px; min-height: 56px; }
+  #info { color: var(--muted); font-size: 15px; line-height: 1.25; }
+  #bar .actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+  #score { display: flex; align-items: center; justify-content: center; gap: clamp(10px, 2vw, 22px); font-family: 'Barlow Condensed', sans-serif; }
+  #score .side { display: flex; align-items: center; gap: 12px; min-width: 0; }
   #score .l { justify-content: flex-end; color: var(--blue); }
   #score .r { justify-content: flex-start; color: var(--red); }
-  #score .name { font-weight: 700; font-size: clamp(18px, 3.2vw, 28px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  #score b { font-weight: 800; font-size: clamp(46px, 9vw, 84px); line-height: 1; font-variant-numeric: tabular-nums; color: var(--ink); }
-  #score .sep { font-weight: 800; font-size: clamp(34px, 6vw, 56px); line-height: 1; color: var(--muted); }
-  #scoreC { display: none; align-items: baseline; justify-content: center; gap: 12px; margin: 2px 0; font-family: 'Barlow Condensed', sans-serif; }
-  #scoreC span { font-weight: 700; font-size: 24px; color: var(--muted); }
-  #scoreC b { font-weight: 800; font-size: 64px; line-height: 1; font-variant-numeric: tabular-nums; }
-  #spdBox { display: none; align-items: center; gap: 12px; flex-wrap: wrap; margin: 4px 0 8px; font-weight: 600; }
+  #score .name { max-width: 200px; font-weight: 700; font-size: clamp(18px, 2.2vw, 26px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #score b, #scoreC b { display: inline-block; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; color: var(--ink); }
+  #score b { font-size: clamp(40px, 5vw, 60px); }
+  #score .sep { font-weight: 800; font-size: clamp(30px, 4vw, 44px); line-height: 1; color: var(--muted); }
+  #scoreC { display: none; align-items: baseline; justify-content: center; gap: 12px; font-family: 'Barlow Condensed', sans-serif; }
+  #scoreC span { font-weight: 700; font-size: 22px; color: var(--muted); }
+  #scoreC b { font-size: 50px; }
+  .pop { animation: pop .38s ease-out; }
+  #spdBox { display: none; align-items: center; gap: 12px; flex-wrap: wrap; margin: 2px 0 6px; font-weight: 600; }
   #spd { width: min(260px, 50vw); accent-color: var(--blue); }
   #spdVal { min-width: 3ch; font: 800 24px 'Barlow Condensed', sans-serif; }
   #spdBox small { color: var(--muted); font-weight: 400; font-size: 15px; }
@@ -67,8 +70,8 @@
   #toolBtns { display: none; gap: 10px; flex-wrap: wrap; align-items: center; }
   #toolBtns .seg { flex: none; }
   #toolBtns .seg button { flex: none; padding: 7px 14px; font-size: 15px; }
-  canvas { display: block; width: auto; height: auto; max-width: 100%; max-height: calc(100vh - 250px); min-height: 260px; margin: 0 auto; cursor: none; touch-action: none; } /* le terrain tient toujours dans la fenêtre */
-  #keys { margin: 8px 2px 0; color: var(--muted); font-size: 15px; }
+  canvas { display: block; width: 100%; height: auto; aspect-ratio: 1080 / 640; margin: 0 auto; cursor: none; touch-action: none; } /* la largeur exacte est calculée en JS pour remplir la fenêtre */
+  #keys { margin: 6px 2px 0; color: var(--muted); font-size: 14px; }
   kbd { padding: 1px 6px; border: 1.5px solid var(--ink); border-radius: 4px; background: #fff; color: var(--ink); font: 600 13px 'Barlow', sans-serif; box-shadow: 0 2px 0 var(--ink); }
   #lockHint { position: absolute; left: 50%; top: 56%; transform: translate(-50%, -50%); display: none; z-index: 5; padding: 14px 20px; border-radius: 6px; background: var(--ink); color: #fff; font-weight: 600; font-size: 18px; line-height: 1.35; text-align: center; pointer-events: none; }
   #lockHint small { display: block; margin-top: 2px; font-weight: 400; font-size: 15px; opacity: .8; }
@@ -80,16 +83,25 @@
   #ask .row { display: flex; gap: 10px; align-items: center; }
   #ask .btn { padding: 9px 20px 8px; font-size: 22px; }
 
-  @media (max-width: 700px) { #floor { opacity: .55; } }
+  @keyframes rise { from { opacity: 0; transform: translateY(10px); } }
+  @keyframes pop { 0% { transform: scale(1); } 40% { transform: scale(1.3); } 100% { transform: scale(1); } }
+  @keyframes popin { from { opacity: 0; transform: scale(.93); } }
+  @keyframes slide { from { transform: translateX(620px) rotate(-720deg); } }
+  #ask .box { animation: popin .16s ease-out; }
+  #slidePuck { transform-box: fill-box; transform-origin: center; animation: slide 1.15s cubic-bezier(.1, .75, .2, 1) .15s both; }
+  @media (max-width: 1100px) { #floor { opacity: .35; } }
+  @media (max-width: 820px) { #bar { grid-template-columns: minmax(0, 1fr) auto; } #bar .mid { grid-column: 1 / -1; grid-row: 2; } }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
   @media (max-width: 480px) { .seg button { padding: 10px 4px; font-size: 14px; } #toolBtns .seg button { padding: 7px 10px; } }
 </style>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%231E2630'/%3E%3Cpath d='M9 16h14' stroke='%23fff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
 </head>
 <body>
 <svg id="floor" aria-hidden="true" viewBox="0 0 1200 800" preserveAspectRatio="xMaxYMid slice">
-  <line x1="940" y1="-60" x2="940" y2="860" stroke="#D8342C" stroke-width="16" opacity=".32"/>
-  <circle cx="940" cy="400" r="270" fill="none" stroke="#2A5FB8" stroke-width="12" opacity=".32"/>
-  <circle cx="940" cy="400" r="20" fill="#D8342C" opacity=".45"/>
+  <line x1="940" y1="-60" x2="940" y2="860" stroke="#D8342C" stroke-width="12"/>
+  <circle cx="940" cy="400" r="270" fill="none" stroke="#2A5FB8" stroke-width="10"/>
+  <circle cx="940" cy="400" r="14" fill="#D8342C"/>
+  <g id="slidePuck"><circle cx="940" cy="400" r="30" fill="#1E2630"/><line x1="926" y1="400" x2="954" y2="400" stroke="#fff" stroke-width="4" stroke-linecap="round"/></g>
 </svg>
 
 <main id="menu">
@@ -112,14 +124,16 @@
 <div id="game">
   <div id="bar">
     <span id="info"></span>
+    <div class="mid">
+      <div id="score">
+        <div class="side l"><span class="name" id="nL"></span><b id="sL">0</b></div>
+        <span class="sep">:</span>
+        <div class="side r"><b id="sR">0</b><span class="name" id="nR"></span></div>
+      </div>
+      <div id="scoreC"><span>Cibles touchées</span><b id="sC">0</b></div>
+    </div>
     <span class="actions"><button class="btn2" id="copy">Copier le lien</button><button class="btn2" id="leave">Retour au lobby</button></span>
   </div>
-  <div id="score">
-    <div class="side l"><span class="name" id="nL"></span><b id="sL">0</b></div>
-    <span class="sep">:</span>
-    <div class="side r"><b id="sR">0</b><span class="name" id="nR"></span></div>
-  </div>
-  <div id="scoreC"><span>Cibles touchées</span><b id="sC">0</b></div>
   <div id="spdBox"><label for="spd">Vitesse de la balle</label><input type="range" id="spd" min="0.5" max="3" step="0.1" value="1"><b id="spdVal">x1.0</b><small>x1.0 est la vitesse normale</small></div>
   <div id="tools">
     <button class="btn2" id="editBtn">Éditer la map</button>
@@ -128,7 +142,7 @@
       <button class="btn2" id="resetBtn">Remettre les balles</button><button class="btn2" id="clearBtn">Tout vider</button><button class="btn2" id="expBtn">Exporter</button><button class="btn2" id="impBtn">Importer</button>
     </span>
   </div>
-  <canvas id="cv" width="1080" height="680"></canvas>
+  <canvas id="cv" width="1080" height="640"></canvas>
   <div id="lockHint">Clique sur le terrain pour prendre la souris<small>Échap pour la rendre</small></div>
   <p id="keys">Bouge avec la souris. <kbd>Z</kbd> et <kbd>E</kbd> font tourner la barre, <kbd>T</kbd> la remet droite, <kbd>Échap</kbd> libère la souris.</p>
 </div>
@@ -139,7 +153,7 @@
 <script src="/shared.js"></script>
 <script src="/engine.js"></script>
 <script>
-const W = 1000, H = 600, M = 40, GOAL = 180, GT = (H - GOAL) / 2, PR = 14, HW = 65, HH = 8;
+const W = 1000, H = 600, M = 40, MY = 20, CW = W + 2 * M, CH = H + 2 * MY, GOAL = 180, GT = (H - GOAL) / 2, PR = 14, HW = 65, HH = 8;
 const $ = id => document.getElementById(id);
 const cv = $('cv'), c = cv.getContext('2d');
 const params = new URLSearchParams(location.search);
@@ -384,9 +398,9 @@ function drawObj(o, alpha) { // murs, bumpers et cibles de la map
 }
 
 function drawC(S) {
-  c.clearRect(0, 0, cv.width, cv.height);
-  c.fillStyle = C.page; c.fillRect(0, 0, cv.width, cv.height);
-  c.save(); c.translate(M, M);
+  c.clearRect(0, 0, CW, CH);
+  c.fillStyle = C.page; c.fillRect(0, 0, CW, CH);
+  c.save(); c.translate(M, MY);
   rink(false);
   for (const o of MAP.o) drawObj(o, 1);
   if (edit) for (const b of MAP.b) { c.strokeStyle = 'rgba(30,38,48,.45)'; c.lineWidth = 2; c.setLineDash([4, 4]); c.beginPath(); c.arc(b[1], b[2], PR + 4, 0, Math.PI * 2); c.stroke(); c.setLineDash([]); }
@@ -398,6 +412,7 @@ function drawC(S) {
       text(q[3], x, y - 80, 15, 'rgba(30,38,48,.75)');
     });
     for (const b of S.b) { drawTrail(b[0], b[1], b[2]); puck(b[1], b[2], b[3]); }
+    drawParts(fdt);
   }
   if (edit) {
     if (tool === 'b') { c.strokeStyle = C.ink; c.lineWidth = 2.5; c.setLineDash([5, 4]); c.beginPath(); c.arc(mouse.x, mouse.y, PR, 0, Math.PI * 2); c.stroke(); c.setLineDash([]); }
@@ -433,7 +448,7 @@ cv.addEventListener('wheel', e => {
 const baseInfo = () => (mode === 'c' ? 'Map libre : construis-la avec tes potes' : side < 0 ? 'Tu regardes la partie' : side === 0 ? 'Tu joues à gauche (bleu)' : 'Tu joues à droite (rouge)') + (fun ? ', vitesse de balle réglable' : '');
 function setSpd(v) { $('spd').value = v; $('spdVal').textContent = 'x' + Number(v).toFixed(1); }
 function toMenu() {
-  local = null; joinInfo = null; side = -1; me = null; buf.length = 0; mode = 'm'; edit = false; fun = false;
+  local = null; lastSc = null; parts.length = 0; joinInfo = null; side = -1; me = null; buf.length = 0; mode = 'm'; edit = false; fun = false;
   $('tools').style.display = 'none'; $('spdBox').style.display = 'none';
   $('ask').style.display = 'none';
   $('game').style.display = 'none';
@@ -505,9 +520,9 @@ const LEASH = 24; // si la barre est bloquée (mur, milieu), la souris ne peut p
 const locked = () => document.pointerLockElement === cv;
 function setMouse(e) {
   if (locked()) return;
-  const r = cv.getBoundingClientRect(), k = cv.width / r.width;
+  const r = cv.getBoundingClientRect(), k = CW / r.width;
   mouse.x = (e.clientX - r.left) * k - M;
-  mouse.y = (e.clientY - r.top) * k - M;
+  mouse.y = (e.clientY - r.top) * k - MY;
   mouse.t = performance.now();
 }
 function myPaddle() { return me || (local && (local.pl ? local.pl.me : local.players && local.players[0])) || null; }
@@ -519,7 +534,7 @@ function leash() {
 }
 document.addEventListener('mousemove', e => {
   if (!locked()) return;
-  const k = cv.width / cv.getBoundingClientRect().width;
+  const k = CW / cv.getBoundingClientRect().width;
   mouse.x = Math.max(0, Math.min(W, mouse.x + e.movementX * k));
   mouse.y = Math.max(0, Math.min(H, mouse.y + e.movementY * k));
   mouse.t = performance.now();
@@ -541,10 +556,80 @@ addEventListener('blur', () => { keys.z = keys.e = keys.t = false; });
 function text(t, x, y, size, color, align = 'center') {
   c.font = '600 ' + size + 'px Barlow, system-ui, sans-serif'; c.fillStyle = color; c.textAlign = align; c.fillText(t, x, y);
 }
-function banner(t, y, size) { // gros message sur la glace (but, victoire, attente)
-  c.save(); c.font = '800 ' + size + 'px ' + DISPLAY; c.textAlign = 'center'; c.lineJoin = 'round';
-  c.lineWidth = 12; c.strokeStyle = C.ink; c.strokeText(t, W / 2, y);
-  c.fillStyle = '#fff'; c.fillText(t, W / 2, y); c.restore();
+function banner(t, y, size) { // gros message sur la glace : il apparaît avec un petit rebond
+  const k = Math.min(1, (performance.now() - msgT) / 300);
+  const e = reduced ? 1 : 0.5 + 0.5 * (1 + 2.70158 * Math.pow(k - 1, 3) + 1.70158 * Math.pow(k - 1, 2));
+  c.save(); c.translate(W / 2, y); c.scale(e, e); c.globalAlpha = reduced ? 1 : Math.min(1, k * 3);
+  c.font = '800 ' + size + 'px ' + DISPLAY; c.textAlign = 'center'; c.lineJoin = 'round';
+  c.lineWidth = 12; c.strokeStyle = C.ink; c.strokeText(t, 0, 0);
+  c.fillStyle = '#fff'; c.fillText(t, 0, 0); c.restore();
+}
+// ===== Petites animations (coupées si le système demande moins de mouvement) =====
+const reduced = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+const parts = [], fxPrev = {};
+let fdt = 0, lastSc = null, lastMsg = '', msgT = 0;
+function burst(x, y, n, cols, speed, life) {
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2, v = speed * (0.35 + Math.random() * 0.75);
+    parts.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, t: 0, life: life * (0.7 + Math.random() * 0.6), col: cols[i % cols.length], r: 1.6 + Math.random() * 2.6 });
+  }
+}
+function fx(S, dt) { // éclats de glace quand la balle tape, gerbe de couleur quand on marque
+  if (!S) return;
+  if (S.m !== lastMsg) { lastMsg = S.m; msgT = performance.now(); }
+  if (reduced) return;
+  const now = performance.now(), tele = [];
+  const balls = mode === 'c' ? S.b.map(b => [b[0], b[1], b[2]]) : [['p', S.p[0], S.p[1]]];
+  for (const [id, x, y] of balls) {
+    const p = fxPrev[id];
+    if (p && dt > 0) {
+      const vx = (x - p.x) / dt, vy = (y - p.y) / dt, jump = Math.hypot(x - p.x, y - p.y), dv = Math.hypot(vx - p.vx, vy - p.vy);
+      let hit = p.hit;
+      if (jump > 150) tele.push({ x: p.x, y: p.y });
+      else if (dv > 700 && Math.hypot(vx, vy) > 150 && now - hit > 90) { burst(x, y, Math.min(14, 4 + dv / 250), ['#FFFFFF', '#BCD3E2', '#8DB0C6'], 150 + dv * 0.1, 0.45); hit = now; }
+      fxPrev[id] = { x, y, vx, vy, hit };
+    } else fxPrev[id] = { x, y, vx: 0, vy: 0, hit: 0 };
+  }
+  if (lastSc) {
+    if (mode === 'm') {
+      if (S.sc[0] > lastSc[0]) burst(W, H / 2, 48, [C.blue, '#FFFFFF', '#9DB8E8'], 420, 0.9); // le joueur de gauche marque dans le but de droite
+      if (S.sc[1] > lastSc[1]) burst(0, H / 2, 48, [C.red, '#FFFFFF', '#F0A29C'], 420, 0.9);
+    } else if (S.sc > lastSc && tele.length) burst(tele[0].x, tele[0].y, 36, [C.green, '#FFFFFF', '#9ED9B8'], 330, 0.8);
+  }
+  lastSc = mode === 'm' ? S.sc.slice() : S.sc;
+}
+function drawParts(dt) {
+  if (!parts.length) return;
+  c.save();
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const p = parts[i]; p.t += dt;
+    if (p.t >= p.life) { parts.splice(i, 1); continue; }
+    const k = 1 - p.t / p.life, f = Math.max(0, 1 - 3 * dt);
+    p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= f; p.vy *= f;
+    c.globalAlpha = k; c.fillStyle = p.col; c.beginPath(); c.arc(p.x, p.y, p.r * (0.4 + 0.6 * k), 0, Math.PI * 2); c.fill();
+  }
+  c.restore();
+}
+
+// Le terrain prend toute la place disponible dans la fenêtre, et reste net (résolution adaptée à l'écran)
+function fit() {
+  const g = $('game');
+  if (g.style.display !== 'block') return;
+  const chrome = g.offsetHeight - cv.offsetHeight;
+  const w = Math.max(320, Math.min(g.clientWidth - 24, (innerHeight - chrome - 18) * CW / CH, 1600));
+  if (Math.abs((parseFloat(cv.style.width) || 0) - w) > 1) cv.style.width = w + 'px';
+  const s = Math.min(2.5, Math.max(1, (cv.getBoundingClientRect().width / CW) * (window.devicePixelRatio || 1)));
+  const bw = Math.round(CW * s), bh = Math.round(CH * s);
+  if (cv.width !== bw) { cv.width = bw; cv.height = bh; }
+  c.setTransform(s, 0, 0, s, 0, 0);
+}
+
+function setNum(id, t) { // le chiffre fait un petit saut quand il change
+  const el = $(id); t = String(t);
+  if (el.textContent === t) return;
+  const first = el.dataset.init !== '1';
+  el.textContent = t; el.dataset.init = '1';
+  if (!first && !reduced) { el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop'); }
 }
 function setText(id, t) { const el = $(id); t = String(t); if (el.textContent !== t) el.textContent = t; }
 function hud(S) { // le tableau des scores est du vrai texte de la page, pas dessiné dans le canvas
@@ -553,14 +638,15 @@ function hud(S) { // le tableau des scores est du vrai texte de la page, pas des
   show('score', !cr, 'flex'); show('scoreC', cr, 'flex');
   document.body.classList.toggle('playing', $('game').style.display === 'block');
   if (!S) return;
-  if (cr) { setText('sC', S.sc); return; }
+  if (cr) { setNum('sC', S.sc); return; }
   setText('nL', S.pl[0] ? S.pl[0][3] : 'En attente'); setText('nR', S.pl[1] ? S.pl[1][3] : 'En attente');
-  setText('sL', S.sc[0]); setText('sR', S.sc[1]);
+  setNum('sL', S.sc[0]); setNum('sR', S.sc[1]);
 }
 
 function draw() {
   requestAnimationFrame(draw);
   const now = performance.now(), dt = Math.min(0.05, (now - last) / 1000); last = now;
+  fdt = dt; fit();
   const lh = !locked() && cv.requestPointerLock && $('game').style.display === 'block' ? 'block' : 'none';
   if ($('lockHint').style.display !== lh) $('lockHint').style.display = lh;
   if (local) tickLocal(dt); else updateMe(dt);
@@ -568,10 +654,11 @@ function draw() {
   const lbl = (mode === 'c' || side < 0 || !S || !S.pl[0] || !S.pl[1] || S.bt) ? 'Retour au lobby' : "Demander l'annulation";
   if ($('leave').textContent !== lbl) $('leave').textContent = lbl;
   hud(S);
+  fx(S, fdt);
   if (mode === 'c') { drawC(S); return; }
-  c.clearRect(0, 0, cv.width, cv.height);
-  c.fillStyle = C.page; c.fillRect(0, 0, cv.width, cv.height);
-  c.save(); c.translate(M, M);
+  c.clearRect(0, 0, CW, CH);
+  c.fillStyle = C.page; c.fillRect(0, 0, CW, CH);
+  c.save(); c.translate(M, MY);
   rink(true);
   if (S) {
     S.pl.forEach((p0, i) => {
@@ -582,6 +669,7 @@ function draw() {
     });
     drawTrail('p', S.p[0], S.p[1]);
     puck(S.p[0], S.p[1], S.p[2]);
+    drawParts(fdt);
     if (S.m) banner(S.m, H / 2 - 90, 62);
     else if (!S.pl[0] || !S.pl[1]) {
       banner("En attente d'un adversaire", H / 2 - 100, 46);
